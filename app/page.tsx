@@ -1,65 +1,304 @@
-import Image from "next/image";
+"use client";
+
+import * as Popover from "@radix-ui/react-popover";
+import { addDays, format, getMonth, getYear, parseISO, setMonth, setYear, startOfMonth } from "date-fns";
+import { CalendarDays, ChevronLeft, ChevronRight, Filter, Plus, Printer, Upload, Download, CircleHelp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BookingBoard } from "@/components/BookingBoard";
+import { BookingDialog } from "@/components/BookingDialog";
+import { BOOKING_CHANNELS, BOOKING_STATUSES, type Booking, type BookingInput, type Lodge } from "@/lib/types";
+import { useBookingStore } from "@/lib/store";
+import { channelLabels, formatMoney, getMonthDays, statusColors, toIsoDate } from "@/lib/utils";
+
+const monthNames = [
+  "Gennaio",
+  "Febbraio",
+  "Marzo",
+  "Aprile",
+  "Maggio",
+  "Giugno",
+  "Luglio",
+  "Agosto",
+  "Settembre",
+  "Ottobre",
+  "Novembre",
+  "Dicembre",
+];
 
 export default function Home() {
+  const {
+    bookings,
+    currentMonth,
+    filters,
+    load,
+    setMonth: setStoreMonth,
+    prevMonth,
+    nextMonth,
+    setSearch,
+    setStatusFilter,
+    setChannelFilter,
+    setShowCancelled,
+    addBooking,
+    updateBooking,
+    deleteBooking,
+    importBookingsMerge,
+    exportBookings,
+  } = useBookingStore();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Booking | null>(null);
+  const [prefill, setPrefill] = useState<{ lodge?: Lodge; day?: string }>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const monthDate = useMemo(() => parseISO(currentMonth), [currentMonth]);
+  const monthDays = useMemo(() => getMonthDays(monthDate), [monthDate]);
+
+  function openNewBooking(lodge?: Lodge, day?: Date) {
+    setEditing(null);
+    setPrefill({ lodge, day: day ? toIsoDate(day) : undefined });
+    setDialogOpen(true);
+  }
+
+  function openEditBooking(booking: Booking) {
+    setEditing(booking);
+    setPrefill({});
+    setDialogOpen(true);
+  }
+
+  function onImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  function onImportFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        const incoming: Booking[] = Array.isArray(parsed) ? parsed : parsed.bookings;
+        if (!Array.isArray(incoming)) {
+          throw new Error("Formato JSON non valido.");
+        }
+        const ok = window.confirm("Confermi merge delle prenotazioni dal file JSON?");
+        if (!ok) {
+          return;
+        }
+        const result = importBookingsMerge(incoming);
+        window.alert(`Import completato. Merge: ${result.merged}, scartate: ${result.skipped}.`);
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : "Errore durante import.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function onExport() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      bookings: exportBookings(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `villa-olimpia-booking-board-${format(monthDate, "yyyy-MM")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const visibleSummary = useMemo(() => {
+    const filtered = bookings.filter((booking) => {
+      if (filters.status !== "all" && booking.status !== filters.status) {
+        return false;
+      }
+      if (filters.channel !== "all" && booking.channel !== filters.channel) {
+        return false;
+      }
+      if (!filters.showCancelled && booking.status === "cancelled") {
+        return false;
+      }
+      if (filters.search.trim() && !booking.guestName.toLowerCase().includes(filters.search.trim().toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+    return {
+      count: filtered.length,
+      total: filtered.reduce((acc, item) => acc + item.totalAmount, 0),
+      deposits: filtered.reduce((acc, item) => acc + item.depositAmount, 0),
+    };
+  }, [bookings, filters]);
+
+  const yearOptions = useMemo(() => {
+    const year = getYear(monthDate);
+    return [year - 2, year - 1, year, year + 1, year + 2];
+  }, [monthDate]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="page-root">
+      <section className="toolbar no-print">
+        <div className="title-row">
+          <h1>Villa Olimpia — Booking Board</h1>
+          <span>{format(monthDate, "MMMM yyyy")}</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <div className="controls-row">
+          <div className="group">
+            <button type="button" className="ghost-btn" onClick={prevMonth}>
+              <ChevronLeft size={16} />
+            </button>
+            <button type="button" className="ghost-btn" onClick={nextMonth}>
+              <ChevronRight size={16} />
+            </button>
+            <select
+              value={getMonth(monthDate)}
+              onChange={(e) => setStoreMonth(setMonth(monthDate, Number(e.target.value)))}
+            >
+              {monthNames.map((month, idx) => (
+                <option key={month} value={idx}>
+                  {month}
+                </option>
+              ))}
+            </select>
+            <select
+              value={getYear(monthDate)}
+              onChange={(e) => setStoreMonth(setYear(monthDate, Number(e.target.value)))}
+            >
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="ghost-btn" onClick={() => setStoreMonth(startOfMonth(new Date()))}>
+              Oggi
+            </button>
+          </div>
+
+          <div className="group grow">
+            <input
+              value={filters.search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca ospite"
+              className="grow"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <select value={filters.status} onChange={(e) => setStatusFilter(e.target.value as (typeof filters)["status"])}>
+              <option value="all">Status: tutti</option>
+              {BOOKING_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+            <select value={filters.channel} onChange={(e) => setChannelFilter(e.target.value as (typeof filters)["channel"])}>
+              <option value="all">Canale: tutti</option>
+              {BOOKING_CHANNELS.map((channel) => (
+                <option key={channel} value={channel}>
+                  {channelLabels[channel]}
+                </option>
+              ))}
+            </select>
+            <label className="checkbox-line">
+              <input
+                type="checkbox"
+                checked={filters.showCancelled}
+                onChange={(e) => setShowCancelled(e.target.checked)}
+              />
+              Mostra cancellate
+            </label>
+          </div>
+
+          <div className="group">
+            <button type="button" className="ghost-btn" onClick={() => openNewBooking()}>
+              <Plus size={15} />
+              Nuova prenotazione
+            </button>
+            <button type="button" className="ghost-btn" onClick={onImportClick}>
+              <Upload size={15} />
+              Import JSON
+            </button>
+            <button type="button" className="ghost-btn" onClick={onExport}>
+              <Download size={15} />
+              Export JSON
+            </button>
+            <button type="button" className="ghost-btn" onClick={() => window.print()}>
+              <Printer size={15} />
+              Stampa
+            </button>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="meta-row">
+          <div className="summary-card">
+            <CalendarDays size={16} />
+            <span>Prenotazioni visibili: {visibleSummary.count}</span>
+          </div>
+          <div className="summary-card">
+            <Filter size={16} />
+            <span>Totale: {formatMoney(visibleSummary.total)}</span>
+          </div>
+          <div className="summary-card">
+            <Filter size={16} />
+            <span>Caparre: {formatMoney(visibleSummary.deposits)}</span>
+          </div>
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <button type="button" className="ghost-btn">
+                <CircleHelp size={15} />
+                Legenda
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content sideOffset={8} className="popover-content">
+                <strong>Legenda stati</strong>
+                <ul>
+                  {BOOKING_STATUSES.map((status) => (
+                    <li key={status}>
+                      <span className="dot" style={{ background: statusColors[status] }} />
+                      {status}
+                    </li>
+                  ))}
+                </ul>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+        </div>
+      </section>
+
+      <section className="print-title">
+        <h2>Villa Olimpia — Booking Board</h2>
+        <p>{format(monthDate, "MMMM yyyy")}</p>
+      </section>
+
+      <BookingBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            onImportFile(file);
+          }
+          e.currentTarget.value = "";
+        }}
+      />
+
+      <BookingDialog
+        open={dialogOpen}
+        booking={editing}
+        initialLodge={prefill.lodge}
+        initialDate={prefill.day || addDays(new Date(), 1).toISOString().slice(0, 10)}
+        onClose={() => setDialogOpen(false)}
+        onCreate={(payload: BookingInput) => addBooking(payload)}
+        onUpdate={(id: string, payload: BookingInput) => updateBooking(id, payload)}
+        onDelete={(id: string) => deleteBooking(id)}
+      />
+    </main>
   );
 }
