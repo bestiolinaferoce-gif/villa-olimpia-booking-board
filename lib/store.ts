@@ -238,13 +238,27 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     const normalized = incoming
       .filter((item) => item && item.id)
       .map((item) => {
+        const raw = item as Record<string, unknown>;
+        // guestsCount: 0 o mancante → 2
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
+        // totalAmount: fallback su grossEarnings (Airbnb) o amountPayout
+        const totalAmount = parseAmt(item.totalAmount) || parseAmt(raw.grossEarnings) || parseAmt(raw.amountPayout);
+        // channel: mappa source:"Airbnb" → "airbnb", ecc.
+        let channel = item.channel as string | undefined;
+        if (!channel && typeof raw.source === "string") {
+          const src = raw.source.toLowerCase();
+          if (src === "airbnb") channel = "airbnb";
+          else if (src.includes("booking")) channel = "booking";
+          else if (src.includes("expedia")) channel = "expedia";
+          else channel = "direct";
+        }
         return {
           ...item,
           guestName: String(item.guestName ?? "").trim() || "Ospite",
           notes: String(item.notes ?? ""),
           guestsCount,
-          totalAmount: parseAmt(item.totalAmount),
+          channel: channel || "direct",
+          totalAmount,
           depositAmount: parseAmt(item.depositAmount),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
