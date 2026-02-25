@@ -10,10 +10,11 @@ import {
   startOfDay,
   startOfMonth,
 } from "date-fns";
-import type { Booking } from "@/lib/types";
+import type { Booking, BookingFilters } from "@/lib/types";
 
 export const STORAGE_KEY = "villa-olimpia-booking-board:v1";
 export const BACKUP_KEY = "villa-olimpia-booking-board:backups:v1";
+export const SETTINGS_KEY = "villa-olimpia-booking-board:settings:v1";
 
 export const statusColors: Record<Booking["status"], string> = {
   confirmed: "#16a34a",
@@ -28,6 +29,30 @@ export const channelLabels: Record<Booking["channel"], string> = {
   booking: "Booking.com",
   expedia: "Expedia",
   other: "Other",
+};
+
+export const statusLabels: Record<Booking["status"], string> = {
+  confirmed: "Confermata",
+  option: "Opzione",
+  blocked: "Bloccata",
+  cancelled: "Cancellata",
+};
+
+type BadgeStyle = { bg: string; text: string; border: string };
+
+export const statusBadge: Record<Booking["status"], BadgeStyle> = {
+  confirmed: { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" },
+  option:    { bg: "#fffbeb", text: "#d97706", border: "#fde68a" },
+  blocked:   { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb" },
+  cancelled: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
+};
+
+export const channelBadge: Record<Booking["channel"], BadgeStyle> = {
+  direct:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  airbnb:   { bg: "#fff1f2", text: "#e61e4d", border: "#fecdd3" },
+  booking:  { bg: "#eff6ff", text: "#003580", border: "#93c5fd" },
+  expedia:  { bg: "#fefce8", text: "#a16207", border: "#fde047" },
+  other:    { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb" },
 };
 
 export function getMonthDays(baseMonth: Date): Date[] {
@@ -69,4 +94,31 @@ export function formatMoney(value: number): string {
     return "€0";
   }
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
+}
+
+export function bookingTooltip(booking: Booking): string {
+  const parts = [
+    `${booking.guestName} · ${booking.guestsCount}p`,
+    `${booking.checkIn} → ${booking.checkOut}`,
+    booking.totalAmount > 0 ? `Totale ${formatMoney(booking.totalAmount)}` : null,
+    booking.depositAmount > 0 ? `Caparra ${formatMoney(booking.depositAmount)}${booking.depositReceived ? " ✓" : ""}` : null,
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
+export function matchesFilters(booking: Booking, filters: BookingFilters): boolean {
+  const search = filters.search.trim().toLowerCase();
+  if (search && !booking.guestName.toLowerCase().includes(search)) {
+    return false;
+  }
+  if (filters.status !== "all" && booking.status !== filters.status) {
+    return false;
+  }
+  if (filters.channel !== "all" && booking.channel !== filters.channel) {
+    return false;
+  }
+  if (!filters.showCancelled && booking.status === "cancelled") {
+    return false;
+  }
+  return true;
 }

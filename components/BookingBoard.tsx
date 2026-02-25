@@ -1,9 +1,10 @@
 "use client";
 
-import { format, isSameDay, parseISO } from "date-fns";
+import { addDays, format, isBefore, isSameDay, parseISO, startOfDay } from "date-fns";
+import { useMemo } from "react";
 import type { Booking, BookingFilters, Lodge } from "@/lib/types";
 import { LODGES } from "@/lib/types";
-import { isActiveOnDay, statusColors } from "@/lib/utils";
+import { bookingTooltip, channelBadge, channelLabels, matchesFilters, statusBadge, statusColors, statusLabels } from "@/lib/utils";
 
 type BookingBoardProps = {
   monthDays: Date[];
@@ -13,25 +14,29 @@ type BookingBoardProps = {
   onEdit: (booking: Booking) => void;
 };
 
-function matchesFilters(booking: Booking, filters: BookingFilters): boolean {
-  const search = filters.search.trim().toLowerCase();
-  if (search && !booking.guestName.toLowerCase().includes(search)) {
-    return false;
-  }
-  if (filters.status !== "all" && booking.status !== filters.status) {
-    return false;
-  }
-  if (filters.channel !== "all" && booking.channel !== filters.channel) {
-    return false;
-  }
-  if (!filters.showCancelled && booking.status === "cancelled") {
-    return false;
-  }
-  return true;
-}
-
 export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }: BookingBoardProps) {
-  const visibleBookings = bookings.filter((booking) => matchesFilters(booking, filters));
+  const visibleBookings = useMemo(
+    () => bookings.filter((booking) => matchesFilters(booking, filters)),
+    [bookings, filters],
+  );
+
+  // Pre-build lookup: "LodgeName::yyyy-MM-dd" → Booking
+  // Parsa checkIn/checkOut di ogni prenotazione una sola volta,
+  // eliminando il .find() + isActiveOnDay() ripetuto su ogni cella.
+  const bookingIndex = useMemo(() => {
+    const map = new Map<string, Booking>();
+    for (const booking of visibleBookings) {
+      const checkIn = startOfDay(parseISO(booking.checkIn));
+      const checkOut = startOfDay(parseISO(booking.checkOut));
+      let cursor = checkIn;
+      while (isBefore(cursor, checkOut)) {
+        map.set(`${booking.lodge}::${format(cursor, "yyyy-MM-dd")}`, booking);
+        cursor = addDays(cursor, 1);
+      }
+    }
+    return map;
+  }, [visibleBookings]);
+
   const today = new Date();
 
   return (
@@ -48,6 +53,7 @@ export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }:
         <tbody>
           {monthDays.map((day) => {
             const isTodayRow = isSameDay(day, today);
+            const dayKey = format(day, "yyyy-MM-dd");
             return (
               <tr key={day.toISOString()} className={isTodayRow ? "today-row" : ""}>
                 <td className="sticky-col day-cell">
@@ -55,9 +61,7 @@ export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }:
                   <small>{format(day, "EEE")}</small>
                 </td>
                 {LODGES.map((lodge) => {
-                  const booking = visibleBookings.find(
-                    (item) => item.lodge === lodge && isActiveOnDay(item, day),
-                  );
+                  const booking = bookingIndex.get(`${lodge}::${dayKey}`);
                   if (!booking) {
                     return (
                       <td key={`${lodge}-${day.toISOString()}`} className="empty-cell" onClick={() => onCreate(lodge, day)}>
@@ -68,14 +72,23 @@ export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }:
                     );
                   }
                   const startsToday = isSameDay(parseISO(booking.checkIn), day);
-                  const endsTomorrow = isSameDay(parseISO(booking.checkOut), day);
+                  // "Checkout domani" si mostra sull'ultima notte attiva (checkOut - 1),
+                  // non sul giorno di checkout stesso (che non è mai attivo per isActiveOnDay).
+                  const checkoutTomorrow = isSameDay(addDays(parseISO(booking.checkOut), -1), day);
                   return (
                     <td key={`${lodge}-${day.toISOString()}`} onClick={() => onEdit(booking)}>
-                      <div className="booking-chip" style={{ borderLeftColor: statusColors[booking.status] }}>
-                        <strong>{booking.guestName}</strong>
-                        <span>{booking.channel}</span>
+                      <div className="booking-chip" data-status={booking.status} title={bookingTooltip(booking)} style={{ borderLeftColor: statusColors[booking.status] }}>
+                        <strong>{booking.guestName} · {booking.guestsCount}p</strong>
+                        <div className="chip-badges">
+                          <span className="badge" style={{ background: statusBadge[booking.status].bg, color: statusBadge[booking.status].text, borderColor: statusBadge[booking.status].border }}>
+                            {statusLabels[booking.status]}
+                          </span>
+                          <span className="badge" style={{ background: channelBadge[booking.channel].bg, color: channelBadge[booking.channel].text, borderColor: channelBadge[booking.channel].border }}>
+                            {channelLabels[booking.channel]}
+                          </span>
+                        </div>
                         {startsToday ? <em>Check-in</em> : null}
-                        {endsTomorrow ? <em>Checkout domani</em> : null}
+                        {checkoutTomorrow ? <em>Checkout domani</em> : null}
                       </div>
                     </td>
                   );

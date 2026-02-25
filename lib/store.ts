@@ -2,13 +2,15 @@ import { create } from "zustand";
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
 import type { BackupSnapshot, Booking, BookingFilters, BookingInput } from "@/lib/types";
-import { BACKUP_KEY, overlaps, STORAGE_KEY } from "@/lib/utils";
+import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 
 type BookingState = {
   bookings: Booking[];
   currentMonth: string;
   filters: BookingFilters;
+  monthTheme: boolean;
   load: () => void;
+  setMonthTheme: (value: boolean) => void;
   setMonth: (month: Date) => void;
   prevMonth: () => void;
   nextMonth: () => void;
@@ -21,6 +23,9 @@ type BookingState = {
   deleteBooking: (id: string) => void;
   importBookingsMerge: (incoming: Booking[]) => { merged: number; skipped: number };
   exportBookings: () => Booking[];
+  toast: { message: string; type: "success" | "error" } | null;
+  showToast: (message: string, type?: "success" | "error") => void;
+  clearToast: () => void;
 };
 
 function validateBookingPayload(payload: BookingInput): void {
@@ -35,11 +40,17 @@ function validateBookingPayload(payload: BookingInput): void {
   if (!(checkIn < checkOut)) {
     throw new Error("Il check-out deve essere successivo al check-in.");
   }
+  if (payload.guestsCount < 1 || !Number.isInteger(payload.guestsCount)) {
+    throw new Error("Il numero ospiti deve essere almeno 1.");
+  }
   if (payload.totalAmount < 0 || payload.depositAmount < 0) {
     throw new Error("Gli importi non possono essere negativi.");
   }
   if (payload.depositAmount > payload.totalAmount) {
     throw new Error("La caparra non può superare il totale.");
+  }
+  if (payload.depositReceived && payload.depositAmount <= 0) {
+    throw new Error("Caparra ricevuta richiede un importo caparra maggiore di zero.");
   }
 }
 
@@ -64,19 +75,44 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
   }
 }
 
+// Debounce timer per persist: mutazioni rapide consecutive producono una sola scrittura.
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 function persist(bookings: Booking[]): void {
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-  const raw = window.localStorage.getItem(BACKUP_KEY);
-  const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
-  const snapshot: BackupSnapshot = {
-    createdAt: new Date().toISOString(),
-    bookings,
-  };
-  const merged = [snapshot, ...current].slice(0, 10);
-  window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer);
+  }
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const write = () => {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+      const raw = window.localStorage.getItem(BACKUP_KEY);
+      const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
+      const snapshot: BackupSnapshot = {
+        createdAt: new Date().toISOString(),
+        bookings,
+      };
+      const merged = [snapshot, ...current].slice(0, 10);
+      window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+    };
+    // requestIdleCallback: scrive quando il browser è idle (Chrome/Firefox).
+    // Fallback sincrono su Safari e ambienti senza supporto.
+    if (typeof requestIdleCallback !== "undefined") {
+      requestIdleCallback(write);
+    } else {
+      write();
+    }
+  }, 250);
+}
+
+function persistSettings(settings: { monthTheme: boolean }): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 export const useBookingStore = create<BookingState>((set, get) => ({
@@ -88,17 +124,36 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     channel: "all",
     showCancelled: false,
   },
+  monthTheme: true,
+  toast: null,
   load: () => {
     if (typeof window === "undefined") {
       return;
+    }
+    const rawSettings = window.localStorage.getItem(SETTINGS_KEY);
+    if (rawSettings) {
+      try {
+        const settings = JSON.parse(rawSettings) as { monthTheme?: boolean };
+        if (typeof settings.monthTheme === "boolean") {
+          set({ monthTheme: settings.monthTheme });
+        }
+      } catch {
+        // ignore malformed settings
+      }
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return;
     }
     try {
-      const parsed = JSON.parse(raw) as Booking[];
-      set({ bookings: parsed });
+      const parsed = JSON.parse(raw) as Array<Booking & { guestsCount?: number }>;
+      const migrated = parsed.map((item) => ({
+        ...item,
+        guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
+      })) as Booking[];
+      const needsPersist = migrated.some((b, i) => typeof parsed[i]?.guestsCount !== "number");
+      set({ bookings: migrated });
+      if (needsPersist) persist(migrated);
     } catch {
       set({ bookings: [] });
     }
@@ -116,6 +171,12 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   setStatusFilter: (value) => set((state) => ({ filters: { ...state.filters, status: value } })),
   setChannelFilter: (value) => set((state) => ({ filters: { ...state.filters, channel: value } })),
   setShowCancelled: (value) => set((state) => ({ filters: { ...state.filters, showCancelled: value } })),
+  setMonthTheme: (value) => {
+    set({ monthTheme: value });
+    persistSettings({ monthTheme: value });
+  },
+  showToast: (message, type = "success") => set({ toast: { message, type } }),
+  clearToast: () => set({ toast: null }),
   addBooking: (payload) => {
     validateBookingPayload(payload);
     const bookings = get().bookings;
@@ -126,6 +187,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       ...payload,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
+      guestsCount: payload.guestsCount,
       createdAt: now,
       updatedAt: now,
     };
@@ -162,16 +224,20 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   importBookingsMerge: (incoming) => {
     const normalized = incoming
       .filter((item) => item && item.id && item.guestName)
-      .map((item) => ({
-        ...item,
-        guestName: String(item.guestName),
-        notes: String(item.notes ?? ""),
-        totalAmount: Number(item.totalAmount ?? 0),
-        depositAmount: Number(item.depositAmount ?? 0),
-        depositReceived: Boolean(item.depositReceived),
-        createdAt: item.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })) as Booking[];
+      .map((item) => {
+        const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
+        return {
+          ...item,
+          guestName: String(item.guestName),
+          notes: String(item.notes ?? ""),
+          guestsCount,
+          totalAmount: Number(item.totalAmount ?? 0),
+          depositAmount: Number(item.depositAmount ?? 0),
+          depositReceived: Boolean(item.depositReceived),
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }) as Booking[];
 
     const map = new Map<string, Booking>();
     get().bookings.forEach((booking) => map.set(booking.id, booking));
@@ -181,6 +247,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
     normalized.forEach((candidate) => {
       try {
+        const guestsCount = typeof candidate.guestsCount === "number" && candidate.guestsCount >= 1 ? candidate.guestsCount : 2;
         const payload: BookingInput = {
           guestName: candidate.guestName,
           lodge: candidate.lodge,
@@ -189,6 +256,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           status: candidate.status,
           channel: candidate.channel,
           notes: candidate.notes,
+          guestsCount,
           totalAmount: candidate.totalAmount,
           depositAmount: candidate.depositAmount,
           depositReceived: candidate.depositReceived,

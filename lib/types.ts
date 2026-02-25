@@ -26,6 +26,7 @@ export type Booking = {
   status: BookingStatus;
   channel: BookingChannel;
   notes: string;
+  guestsCount: number;
   totalAmount: number;
   depositAmount: number;
   depositReceived: boolean;

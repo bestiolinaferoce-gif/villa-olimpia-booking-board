@@ -1,58 +1,92 @@
 "use client";
 
-import * as Popover from "@radix-ui/react-popover";
-import { addDays, format, getMonth, getYear, parseISO, setMonth, setYear, startOfMonth } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, Filter, Plus, Printer, Upload, Download, CircleHelp } from "lucide-react";
+import { addDays, format, getMonth, getYear, parseISO, startOfMonth } from "date-fns";
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookingBoard } from "@/components/BookingBoard";
 import { BookingDialog } from "@/components/BookingDialog";
-import { BOOKING_CHANNELS, BOOKING_STATUSES, type Booking, type BookingInput, type Lodge } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmailImportDialog } from "@/components/EmailImportDialog";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Toast } from "@/components/Toast";
+import { Toolbar } from "@/components/Toolbar";
+import { type Booking, type BookingInput, type Lodge } from "@/lib/types";
 import { useBookingStore } from "@/lib/store";
-import { channelLabels, formatMoney, getMonthDays, statusColors, toIsoDate } from "@/lib/utils";
-
-const monthNames = [
-  "Gennaio",
-  "Febbraio",
-  "Marzo",
-  "Aprile",
-  "Maggio",
-  "Giugno",
-  "Luglio",
-  "Agosto",
-  "Settembre",
-  "Ottobre",
-  "Novembre",
-  "Dicembre",
-];
+import { useShallow } from "zustand/react/shallow";
+import { getMonthDays, matchesFilters, toIsoDate } from "@/lib/utils";
 
 export default function Home() {
-  const {
-    bookings,
-    currentMonth,
-    filters,
-    load,
-    setMonth: setStoreMonth,
-    prevMonth,
-    nextMonth,
-    setSearch,
-    setStatusFilter,
-    setChannelFilter,
-    setShowCancelled,
-    addBooking,
-    updateBooking,
-    deleteBooking,
-    importBookingsMerge,
-    exportBookings,
-  } = useBookingStore();
+  const { bookings, filters } = useBookingStore(
+    useShallow((s) => ({ bookings: s.bookings, filters: s.filters }))
+  );
+  const { currentMonth, prevMonth, nextMonth, setMonth: setStoreMonth } = useBookingStore(
+    useShallow((s) => ({
+      currentMonth: s.currentMonth,
+      prevMonth: s.prevMonth,
+      nextMonth: s.nextMonth,
+      setMonth: s.setMonth,
+    }))
+  );
+  const { monthTheme, setMonthTheme } = useBookingStore(
+    useShallow((s) => ({ monthTheme: s.monthTheme, setMonthTheme: s.setMonthTheme }))
+  );
+  const { setSearch, setStatusFilter, setChannelFilter, setShowCancelled } = useBookingStore(
+    useShallow((s) => ({
+      setSearch: s.setSearch,
+      setStatusFilter: s.setStatusFilter,
+      setChannelFilter: s.setChannelFilter,
+      setShowCancelled: s.setShowCancelled,
+    }))
+  );
+  const { load, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast } = useBookingStore(
+    useShallow((s) => ({
+      load: s.load,
+      addBooking: s.addBooking,
+      updateBooking: s.updateBooking,
+      deleteBooking: s.deleteBooking,
+      importBookingsMerge: s.importBookingsMerge,
+      exportBookings: s.exportBookings,
+      showToast: s.showToast,
+    }))
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Booking | null>(null);
-  const [prefill, setPrefill] = useState<{ lodge?: Lodge; day?: string }>({});
+  const [prefill, setPrefill] = useState<Partial<BookingInput> & { lodge?: Lodge; day?: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importConfirm, setImportConfirm] = useState<{ incoming: Booking[] } | null>(null);
+  const [emailImportOpen, setEmailImportOpen] = useState(false);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (dialogOpen) return;
+      switch (e.key) {
+        case "n":
+        case "N":
+          e.preventDefault();
+          setEditing(null);
+          setPrefill({});
+          setDialogOpen(true);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          prevMonth();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          nextMonth();
+          break;
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dialogOpen, prevMonth, nextMonth]);
 
   const monthDate = useMemo(() => parseISO(currentMonth), [currentMonth]);
   const monthDays = useMemo(() => getMonthDays(monthDate), [monthDate]);
@@ -60,6 +94,12 @@ export default function Home() {
   function openNewBooking(lodge?: Lodge, day?: Date) {
     setEditing(null);
     setPrefill({ lodge, day: day ? toIsoDate(day) : undefined });
+    setDialogOpen(true);
+  }
+
+  function openNewBookingFromPrefill(prefillData: Partial<BookingInput> & { lodge?: Lodge }) {
+    setEditing(null);
+    setPrefill(prefillData);
     setDialogOpen(true);
   }
 
@@ -82,14 +122,9 @@ export default function Home() {
         if (!Array.isArray(incoming)) {
           throw new Error("Formato JSON non valido.");
         }
-        const ok = window.confirm("Confermi merge delle prenotazioni dal file JSON?");
-        if (!ok) {
-          return;
-        }
-        const result = importBookingsMerge(incoming);
-        window.alert(`Import completato. Merge: ${result.merged}, scartate: ${result.skipped}.`);
+        setImportConfirm({ incoming });
       } catch (e) {
-        window.alert(e instanceof Error ? e.message : "Errore durante import.");
+        showToast(e instanceof Error ? e.message : "Errore durante import.", "error");
       }
     };
     reader.readAsText(file);
@@ -110,27 +145,37 @@ export default function Home() {
   }
 
   const visibleSummary = useMemo(() => {
-    const filtered = bookings.filter((booking) => {
-      if (filters.status !== "all" && booking.status !== filters.status) {
-        return false;
-      }
-      if (filters.channel !== "all" && booking.channel !== filters.channel) {
-        return false;
-      }
-      if (!filters.showCancelled && booking.status === "cancelled") {
-        return false;
-      }
-      if (filters.search.trim() && !booking.guestName.toLowerCase().includes(filters.search.trim().toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
+    const filtered = bookings.filter((booking) => matchesFilters(booking, filters));
     return {
       count: filtered.length,
       total: filtered.reduce((acc, item) => acc + item.totalAmount, 0),
-      deposits: filtered.reduce((acc, item) => acc + item.depositAmount, 0),
+      deposits: filtered.reduce((acc, item) => acc + (item.depositReceived ? item.depositAmount : 0), 0),
     };
   }, [bookings, filters]);
+
+  useEffect(() => {
+    const MONTH_ACCENTS: Record<number, string> = {
+      0: "#0c4a6e",
+      1: "#6b21a8",
+      2: "#166534",
+      3: "#0d9488",
+      4: "#4d7c0f",
+      5: "#b45309",
+      6: "#c2410c",
+      7: "#9f1239",
+      8: "#9d174d",
+      9: "#3730a3",
+      10: "#475569",
+      11: "#1d4ed8",
+    };
+    const accent = monthTheme ? (MONTH_ACCENTS[getMonth(monthDate)] ?? "#1d4ed8") : "#1d4ed8";
+    const r = parseInt(accent.slice(1, 3), 16);
+    const g = parseInt(accent.slice(3, 5), 16);
+    const b = parseInt(accent.slice(5, 7), 16);
+    document.documentElement.style.setProperty("--accent", accent);
+    document.documentElement.style.setProperty("--today-bg", `rgba(${r}, ${g}, ${b}, 0.04)`);
+    document.documentElement.style.setProperty("--today-border", `rgba(${r}, ${g}, ${b}, 0.2)`);
+  }, [monthDate, monthTheme]);
 
   const yearOptions = useMemo(() => {
     const year = getYear(monthDate);
@@ -139,141 +184,40 @@ export default function Home() {
 
   return (
     <main className="page-root">
-      <section className="toolbar no-print">
-        <div className="title-row">
-          <h1>Villa Olimpia — Booking Board</h1>
-          <span>{format(monthDate, "MMMM yyyy")}</span>
-        </div>
-
-        <div className="controls-row">
-          <div className="group">
-            <button type="button" className="ghost-btn" onClick={prevMonth}>
-              <ChevronLeft size={16} />
-            </button>
-            <button type="button" className="ghost-btn" onClick={nextMonth}>
-              <ChevronRight size={16} />
-            </button>
-            <select
-              value={getMonth(monthDate)}
-              onChange={(e) => setStoreMonth(setMonth(monthDate, Number(e.target.value)))}
-            >
-              {monthNames.map((month, idx) => (
-                <option key={month} value={idx}>
-                  {month}
-                </option>
-              ))}
-            </select>
-            <select
-              value={getYear(monthDate)}
-              onChange={(e) => setStoreMonth(setYear(monthDate, Number(e.target.value)))}
-            >
-              {yearOptions.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="ghost-btn" onClick={() => setStoreMonth(startOfMonth(new Date()))}>
-              Oggi
-            </button>
-          </div>
-
-          <div className="group grow">
-            <input
-              value={filters.search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cerca ospite"
-              className="grow"
-            />
-            <select value={filters.status} onChange={(e) => setStatusFilter(e.target.value as (typeof filters)["status"])}>
-              <option value="all">Status: tutti</option>
-              {BOOKING_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <select value={filters.channel} onChange={(e) => setChannelFilter(e.target.value as (typeof filters)["channel"])}>
-              <option value="all">Canale: tutti</option>
-              {BOOKING_CHANNELS.map((channel) => (
-                <option key={channel} value={channel}>
-                  {channelLabels[channel]}
-                </option>
-              ))}
-            </select>
-            <label className="checkbox-line">
-              <input
-                type="checkbox"
-                checked={filters.showCancelled}
-                onChange={(e) => setShowCancelled(e.target.checked)}
-              />
-              Mostra cancellate
-            </label>
-          </div>
-
-          <div className="group">
-            <button type="button" className="ghost-btn" onClick={() => openNewBooking()}>
-              <Plus size={15} />
-              Nuova prenotazione
-            </button>
-            <button type="button" className="ghost-btn" onClick={onImportClick}>
-              <Upload size={15} />
-              Import JSON
-            </button>
-            <button type="button" className="ghost-btn" onClick={onExport}>
-              <Download size={15} />
-              Export JSON
-            </button>
-            <button type="button" className="ghost-btn" onClick={() => window.print()}>
-              <Printer size={15} />
-              Stampa
-            </button>
-          </div>
-        </div>
-
-        <div className="meta-row">
-          <div className="summary-card">
-            <CalendarDays size={16} />
-            <span>Prenotazioni visibili: {visibleSummary.count}</span>
-          </div>
-          <div className="summary-card">
-            <Filter size={16} />
-            <span>Totale: {formatMoney(visibleSummary.total)}</span>
-          </div>
-          <div className="summary-card">
-            <Filter size={16} />
-            <span>Caparre: {formatMoney(visibleSummary.deposits)}</span>
-          </div>
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <button type="button" className="ghost-btn">
-                <CircleHelp size={15} />
-                Legenda
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content sideOffset={8} className="popover-content">
-                <strong>Legenda stati</strong>
-                <ul>
-                  {BOOKING_STATUSES.map((status) => (
-                    <li key={status}>
-                      <span className="dot" style={{ background: statusColors[status] }} />
-                      {status}
-                    </li>
-                  ))}
-                </ul>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
-        </div>
-      </section>
+      <Toolbar
+        monthDate={monthDate}
+        yearOptions={yearOptions}
+        onPrev={prevMonth}
+        onNext={nextMonth}
+        onSetMonth={setStoreMonth}
+        onToday={() => setStoreMonth(startOfMonth(new Date()))}
+        filters={filters}
+        monthTheme={monthTheme}
+        onSearch={setSearch}
+        onStatusFilter={setStatusFilter}
+        onChannelFilter={setChannelFilter}
+        onShowCancelled={setShowCancelled}
+        onMonthTheme={setMonthTheme}
+        onNewBooking={() => openNewBooking()}
+        onEmailImport={() => setEmailImportOpen(true)}
+        onImportClick={onImportClick}
+        onExport={onExport}
+        visibleCount={visibleSummary.count}
+        visibleTotal={visibleSummary.total}
+        visibleDeposits={visibleSummary.deposits}
+      />
 
       <section className="print-title">
-        <h2>Villa Olimpia — Booking Board</h2>
-        <p>{format(monthDate, "MMMM yyyy")}</p>
+        <Image src="/logo-villa-olimpia.png" alt="" width={36} height={36} className="print-logo" />
+        <div>
+          <h2>Villa Olimpia — Booking Board</h2>
+          <p>{format(monthDate, "MMMM yyyy")}</p>
+        </div>
       </section>
 
-      <BookingBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
+      <ErrorBoundary>
+        <BookingBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
+      </ErrorBoundary>
 
       <input
         ref={fileInputRef}
@@ -294,11 +238,34 @@ export default function Home() {
         booking={editing}
         initialLodge={prefill.lodge}
         initialDate={prefill.day || addDays(new Date(), 1).toISOString().slice(0, 10)}
+        initialPrefill={prefill}
         onClose={() => setDialogOpen(false)}
         onCreate={(payload: BookingInput) => addBooking(payload)}
         onUpdate={(id: string, payload: BookingInput) => updateBooking(id, payload)}
         onDelete={(id: string) => deleteBooking(id)}
       />
+
+      <EmailImportDialog
+        open={emailImportOpen}
+        onClose={() => setEmailImportOpen(false)}
+        onCreateFromPrefill={openNewBookingFromPrefill}
+      />
+
+      <ConfirmDialog
+        open={importConfirm !== null}
+        title="Conferma import"
+        message="Stai importando prenotazioni da un file JSON. Confermi il merge?"
+        confirmLabel="Importa"
+        onConfirm={() => {
+          if (!importConfirm) return;
+          const result = importBookingsMerge(importConfirm.incoming);
+          setImportConfirm(null);
+          showToast(`Import completato. Merge: ${result.merged}, scartate: ${result.skipped}.`);
+        }}
+        onClose={() => setImportConfirm(null)}
+      />
+
+      <Toast />
     </main>
   );
 }

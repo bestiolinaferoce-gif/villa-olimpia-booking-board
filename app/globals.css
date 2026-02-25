@@ -1,11 +1,14 @@
 :root {
   color-scheme: light;
-  --bg: #f3f4f6;
+  --bg: #fafafa;
   --panel: #ffffff;
   --text: #111827;
   --muted: #6b7280;
-  --line: #d1d5db;
+  --line: #e5e7eb;
   --accent: #1d4ed8;
+  --zebra: rgba(0, 0, 0, 0.02);
+  --today-bg: rgba(29, 78, 216, 0.04);
+  --today-border: rgba(29, 78, 216, 0.2);
 }
 
 * {
@@ -37,6 +40,7 @@ textarea {
 .toolbar {
   background: var(--panel);
   border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
   border-radius: 14px;
   padding: 14px;
   display: grid;
@@ -49,9 +53,21 @@ textarea {
   justify-content: space-between;
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .title-row h1 {
   margin: 0;
   font-size: 1.28rem;
+  font-weight: 600;
 }
 
 .title-row span {
@@ -109,6 +125,13 @@ textarea {
   color: #fff;
 }
 
+.primary-btn:hover,
+.ghost-btn.primary-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .danger-btn {
   border-color: #dc2626;
   color: #dc2626;
@@ -155,24 +178,42 @@ textarea {
 
 .booking-table th,
 .booking-table td {
-  border: 1px solid #e5e7eb;
-  padding: 6px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
   vertical-align: top;
 }
 
 .booking-table thead th {
   position: sticky;
   top: 0;
-  z-index: 5;
-  background: #f8fafc;
+  z-index: 10;
+  background: var(--panel);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+
+.booking-table thead th.sticky-col {
+  z-index: 11;
 }
 
 .sticky-col {
   position: sticky;
   left: 0;
   z-index: 6;
-  background: #fff;
-  min-width: 108px;
+  background: var(--panel);
+  min-width: 112px;
+}
+
+.booking-table tbody tr:nth-child(even) .sticky-col {
+  background: var(--zebra);
+}
+
+.booking-table tbody tr:nth-child(even) td {
+  background: var(--zebra);
+}
+
+.booking-table thead tr .sticky-col {
+  background: var(--panel);
 }
 
 .day-cell {
@@ -186,12 +227,14 @@ textarea {
 
 .today-row .day-cell,
 .today-row td {
-  background: #ecfeff;
+  background: var(--today-bg) !important;
+  border-color: var(--today-border);
 }
 
 .empty-cell {
   cursor: pointer;
   text-align: center;
+  background: transparent;
 }
 
 .cell-btn {
@@ -202,17 +245,15 @@ textarea {
 }
 
 .booking-chip {
-  border-left: 4px solid;
   border-radius: 8px;
-  border-top: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 6px;
-  min-height: 62px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  padding: 8px 10px;
+  min-height: 64px;
   display: grid;
-  gap: 3px;
+  gap: 4px;
   cursor: pointer;
-  background: #fff;
+  background: var(--panel);
 }
 
 .booking-chip strong {
@@ -226,8 +267,30 @@ textarea {
   font-style: normal;
 }
 
+.chip-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
 .print-title {
   display: none;
+}
+
+.print-title .print-logo {
+  height: 32px;
+  width: auto;
 }
 
 .dialog-overlay {
@@ -292,6 +355,34 @@ textarea {
   padding: 9px 10px;
 }
 
+.field-error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.preview-box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.preview-box dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 10px 0 0;
+}
+
+.preview-box dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.preview-box dd {
+  margin: 0;
+}
+
 .popover-content {
   background: #fff;
   border: 1px solid var(--line);
@@ -326,7 +417,23 @@ textarea {
   }
 }
 
+@media (max-width: 860px) {
+  .page-root {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .title-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
 @media print {
+  :root {
+    --accent: #6b7280;
+  }
+
   body {
     background: #fff;
   }
@@ -343,14 +450,26 @@ textarea {
   }
 
   .print-title {
-    display: block;
-    padding: 8px 2px;
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 2px solid #9ca3af;
+  }
+
+  .print-title .print-logo {
+    height: 36px;
   }
 
   .print-title h2,
   .print-title p {
     margin: 0;
     text-transform: capitalize;
+    color: #000;
+  }
+
+  .print-title h2 {
+    font-size: 1.4rem;
   }
 
   .board-wrap {
@@ -367,11 +486,21 @@ textarea {
 
   .booking-table th,
   .booking-table td {
-    padding: 3px;
+    padding: 4px 6px;
   }
 
   .sticky-col,
   .booking-table thead th {
     position: static;
+  }
+
+  .booking-chip {
+    border-left-color: #9ca3af;
+  }
+
+  .today-row .day-cell,
+  .today-row td {
+    background: #f3f4f6 !important;
+    border-color: #9ca3af;
   }
 }
