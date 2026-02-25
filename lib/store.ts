@@ -5,6 +5,16 @@ import type { BackupSnapshot, Booking, BookingChannel, BookingFilters, BookingIn
 import { BOOKING_CHANNELS, BOOKING_STATUSES } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 
+const SEED_BOOKINGS: Booking[] = [
+  { id: "HM4XSWJTKE",  guestName: "Evgueni Spassov",   lodge: "Geranio",    checkIn: "2026-06-25", checkOut: "2026-06-30", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 750.00,   depositAmount: 0, depositReceived: false, createdAt: "2026-02-18T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "HMRWRTKKWH",  guestName: "Roberto Bagatti",   lodge: "Geranio",    checkIn: "2026-06-30", checkOut: "2026-07-15", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 2313.45, depositAmount: 0, depositReceived: false, createdAt: "2026-01-18T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "HMBXDH4EMJ",  guestName: "Christophe Roux",   lodge: "Geranio",    checkIn: "2026-07-16", checkOut: "2026-07-18", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 318.00,  depositAmount: 0, depositReceived: false, createdAt: "2026-02-17T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "HMXMEPZ5KJ",  guestName: "Stefano Canaglia",  lodge: "Lavanda",    checkIn: "2026-07-18", checkOut: "2026-07-25", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-15T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "HMDKAT5QCE",  guestName: "Camilla Saletti",   lodge: "Geranio",    checkIn: "2026-07-20", checkOut: "2026-07-24", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 636.00,  depositAmount: 0, depositReceived: false, createdAt: "2026-02-14T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "HMCECEDTNB",  guestName: "Michela De Munari", lodge: "Lavanda",    checkIn: "2026-07-26", checkOut: "2026-08-02", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-07T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "a16f62f3-932c-4932-85d9-d63da692f98a", guestName: "Pietro Miele", lodge: "Frangipane", checkIn: "2026-08-01", checkOut: "2026-08-07", status: "confirmed", channel: "direct", notes: "", guestsCount: 2, totalAmount: 0, depositAmount: 0, depositReceived: true, createdAt: "2026-02-23T13:16:12.657Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+];
+
 type BookingState = {
   bookings: Booking[];
   currentMonth: string;
@@ -144,6 +154,9 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      // Primo accesso: carica i dati iniziali
+      set({ bookings: SEED_BOOKINGS });
+      persist(SEED_BOOKINGS);
       return;
     }
     try {
