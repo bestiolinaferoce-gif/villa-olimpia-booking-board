@@ -223,17 +223,29 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     persist(next);
   },
   importBookingsMerge: (incoming) => {
+    function parseAmt(v: unknown): number {
+      if (typeof v === "number") return Math.max(0, isFinite(v) ? v : 0);
+      if (typeof v === "string") {
+        // gestisce "1.200,50" (IT) e "1,200.50" (EN)
+        const cleaned = v.includes(",") && v.includes(".")
+          ? v.replace(/\./g, "").replace(",", ".")   // 1.200,50 → 1200.50
+          : v.replace(",", ".");                      // 1200,50 → 1200.50
+        return Math.max(0, parseFloat(cleaned) || 0);
+      }
+      return 0;
+    }
+
     const normalized = incoming
-      .filter((item) => item && item.id && item.guestName)
+      .filter((item) => item && item.id)
       .map((item) => {
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
         return {
           ...item,
-          guestName: String(item.guestName),
+          guestName: String(item.guestName ?? "").trim() || "Ospite",
           notes: String(item.notes ?? ""),
           guestsCount,
-          totalAmount: Number(item.totalAmount ?? 0),
-          depositAmount: Number(item.depositAmount ?? 0),
+          totalAmount: parseAmt(item.totalAmount),
+          depositAmount: parseAmt(item.depositAmount),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),

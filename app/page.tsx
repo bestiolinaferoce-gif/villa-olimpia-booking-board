@@ -262,7 +262,15 @@ export default function Home() {
           if (!importConfirm) return;
           const result = importBookingsMerge(importConfirm.incoming);
           setImportConfirm(null);
-          showToast(`Import completato. Merge: ${result.merged}, scartate: ${result.skipped}.`);
+          // Naviga al mese della prima prenotazione importata e azzera i filtri
+          const sorted = [...importConfirm.incoming].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+          if (sorted.length > 0) {
+            setStoreMonth(startOfMonth(parseISO(sorted[0].checkIn)));
+          }
+          setSearch("");
+          setStatusFilter("all");
+          setChannelFilter("all");
+          showToast(`Import completato: ${result.merged} aggiunte, ${result.skipped} scartate.`);
         }}
         onClose={() => setImportConfirm(null)}
       />
