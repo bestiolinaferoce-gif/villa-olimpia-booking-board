@@ -16,7 +16,7 @@ export function PasswordGate({ children }: { children: React.ReactNode }) {
   if (unlocked) return <>{children}</>;
 
   function submit() {
-    const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "villaolimpia";
+    const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "caccapanna73";
     if (value === password) {
       sessionStorage.setItem(SESSION_KEY, "1");
       setUnlocked(true);
