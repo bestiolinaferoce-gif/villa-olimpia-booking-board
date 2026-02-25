@@ -6,9 +6,10 @@
   --muted: #6b7280;
   --line: #e5e7eb;
   --accent: #1d4ed8;
-  --zebra: rgba(0, 0, 0, 0.02);
-  --today-bg: rgba(29, 78, 216, 0.04);
-  --today-border: rgba(29, 78, 216, 0.2);
+  --accent-faint: rgba(29, 78, 216, 0.07);
+  --zebra: rgba(0, 0, 0, 0.025);
+  --today-bg: rgba(29, 78, 216, 0.06);
+  --today-border: rgba(29, 78, 216, 0.25);
 }
 
 * {
@@ -68,13 +69,21 @@ textarea {
 
 .title-row h1 {
   margin: 0;
-  font-size: 1.28rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
 }
 
 .title-row span {
   color: var(--muted);
   text-transform: capitalize;
+  background: var(--accent-faint);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .controls-row {
@@ -119,6 +128,13 @@ textarea {
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ghost-btn:hover {
+  background: var(--accent-faint);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .primary-btn {
@@ -132,6 +148,7 @@ textarea {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35);
 }
 
 .danger-btn {
@@ -158,11 +175,12 @@ textarea {
 .summary-card {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 7px 10px;
-  background: #fff;
+  padding: 7px 12px;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-faint) 100%);
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-weight: 500;
 }
 
 .board-wrap {
@@ -170,6 +188,7 @@ textarea {
   border-radius: 14px;
   overflow: auto;
   background: var(--panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
 }
 
 .booking-table {
@@ -189,13 +208,17 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--panel);
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
-  border-bottom: 2px solid var(--accent);
+  border-color: rgba(255, 255, 255, 0.15);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.15);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .booking-table thead th.sticky-col {
   z-index: 11;
+  background: var(--accent);
 }
 
 .sticky-col {
