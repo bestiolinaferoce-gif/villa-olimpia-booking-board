@@ -10,6 +10,7 @@ import { EmailImportDialog } from "@/components/EmailImportDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@/components/Toast";
 import { Toolbar } from "@/components/Toolbar";
+import { PasswordGate } from "@/components/PasswordGate";
 import { type Booking, type BookingInput, type Lodge } from "@/lib/types";
 import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
@@ -183,6 +184,7 @@ export default function Home() {
   }, [monthDate]);
 
   return (
+    <PasswordGate>
     <main className="page-root">
       <Toolbar
         monthDate={monthDate}
@@ -267,5 +269,6 @@ export default function Home() {
 
       <Toast />
     </main>
+    </PasswordGate>
   );
 }
