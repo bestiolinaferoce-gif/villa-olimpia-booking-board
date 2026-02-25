@@ -77,19 +77,25 @@ export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }:
                   const checkoutTomorrow = isSameDay(addDays(parseISO(booking.checkOut), -1), day);
                   return (
                     <td key={`${lodge}-${day.toISOString()}`} onClick={() => onEdit(booking)}>
-                      <div className="booking-chip" data-status={booking.status} title={bookingTooltip(booking)} style={{ borderLeftColor: statusColors[booking.status] }}>
-                        <strong>{booking.guestName} · {booking.guestsCount}p</strong>
-                        <div className="chip-badges">
-                          <span className="badge" style={{ background: statusBadge[booking.status].bg, color: statusBadge[booking.status].text, borderColor: statusBadge[booking.status].border }}>
-                            {statusLabels[booking.status]}
-                          </span>
-                          <span className="badge" style={{ background: channelBadge[booking.channel].bg, color: channelBadge[booking.channel].text, borderColor: channelBadge[booking.channel].border }}>
-                            {channelLabels[booking.channel]}
-                          </span>
-                        </div>
-                        {startsToday ? <em>Check-in</em> : null}
-                        {checkoutTomorrow ? <em>Checkout domani</em> : null}
-                      </div>
+                      {(() => {
+                        const sBadge = statusBadge[booking.status] ?? statusBadge.confirmed;
+                        const cBadge = channelBadge[booking.channel] ?? channelBadge.other;
+                        return (
+                          <div className="booking-chip" data-status={booking.status} title={bookingTooltip(booking)} style={{ borderLeftColor: statusColors[booking.status] ?? statusColors.confirmed }}>
+                            <strong>{booking.guestName} · {booking.guestsCount}p</strong>
+                            <div className="chip-badges">
+                              <span className="badge" style={{ background: sBadge.bg, color: sBadge.text, borderColor: sBadge.border }}>
+                                {statusLabels[booking.status] ?? booking.status}
+                              </span>
+                              <span className="badge" style={{ background: cBadge.bg, color: cBadge.text, borderColor: cBadge.border }}>
+                                {channelLabels[booking.channel] ?? booking.channel}
+                              </span>
+                            </div>
+                            {startsToday ? <em>Check-in</em> : null}
+                            {checkoutTomorrow ? <em>Checkout domani</em> : null}
+                          </div>
+                        );
+                      })()}
                     </td>
                   );
                 })}

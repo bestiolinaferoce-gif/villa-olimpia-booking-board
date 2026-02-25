@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
-import type { BackupSnapshot, Booking, BookingFilters, BookingInput } from "@/lib/types";
+import type { BackupSnapshot, Booking, BookingChannel, BookingFilters, BookingInput, BookingStatus } from "@/lib/types";
+import { BOOKING_CHANNELS, BOOKING_STATUSES } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 
 type BookingState = {
@@ -253,8 +254,8 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           lodge: candidate.lodge,
           checkIn: candidate.checkIn,
           checkOut: candidate.checkOut,
-          status: candidate.status,
-          channel: candidate.channel,
+          status: (BOOKING_STATUSES as readonly string[]).includes(candidate.status) ? candidate.status as BookingStatus : "confirmed",
+          channel: (BOOKING_CHANNELS as readonly string[]).includes(candidate.channel) ? candidate.channel as BookingChannel : "direct",
           notes: candidate.notes,
           guestsCount,
           totalAmount: candidate.totalAmount,
