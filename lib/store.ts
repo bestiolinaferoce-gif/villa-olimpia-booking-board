@@ -12,7 +12,7 @@ const SEED_BOOKINGS: Booking[] = [
   { id: "HMXMEPZ5KJ",  guestName: "Stefano Canaglia",  lodge: "Lavanda",    checkIn: "2026-07-18", checkOut: "2026-07-25", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-15T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
   { id: "HMDKAT5QCE",  guestName: "Camilla Saletti",   lodge: "Geranio",    checkIn: "2026-07-20", checkOut: "2026-07-24", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 636.00,  depositAmount: 0, depositReceived: false, createdAt: "2026-02-14T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
   { id: "HMCECEDTNB",  guestName: "Michela De Munari", lodge: "Lavanda",    checkIn: "2026-07-26", checkOut: "2026-08-02", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-07T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "a16f62f3-932c-4932-85d9-d63da692f98a", guestName: "Pietro Miele", lodge: "Frangipane", checkIn: "2026-08-01", checkOut: "2026-08-07", status: "confirmed", channel: "direct", notes: "", guestsCount: 2, totalAmount: 0, depositAmount: 0, depositReceived: true, createdAt: "2026-02-23T13:16:12.657Z", updatedAt: "2026-02-25T12:00:00.000Z" },
+  { id: "a16f62f3-932c-4932-85d9-d63da692f98a", guestName: "Pietro Miele", lodge: "Frangipane", checkIn: "2026-08-01", checkOut: "2026-08-07", status: "confirmed", channel: "direct", notes: "", guestsCount: 2, totalAmount: 0, depositAmount: 0, depositReceived: false, createdAt: "2026-02-23T13:16:12.657Z", updatedAt: "2026-02-25T12:00:00.000Z" },
 ];
 
 type BookingState = {
@@ -254,8 +254,13 @@ export const useBookingStore = create<BookingState>((set, get) => ({
         const raw = item as Record<string, unknown>;
         // guestsCount: 0 o mancante → 2
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
-        // totalAmount: fallback su grossEarnings (Airbnb) o amountPayout
-        const totalAmount = parseAmt(item.totalAmount) || parseAmt(raw.grossEarnings) || parseAmt(raw.amountPayout);
+        // totalAmount: se il campo è esplicitamente presente nel JSON (anche con valore 0)
+        // lo preserva; fallback su grossEarnings/amountPayout solo se assente.
+        const rawTotal = raw.totalAmount;
+        const hasTotalAmount = rawTotal !== undefined && rawTotal !== null && rawTotal !== "";
+        const totalAmount = hasTotalAmount
+          ? parseAmt(rawTotal)
+          : parseAmt(raw.grossEarnings) || parseAmt(raw.amountPayout);
         // channel: mappa source:"Airbnb" → "airbnb", ecc.
         let channel = item.channel as string | undefined;
         if (!channel && typeof raw.source === "string") {
@@ -287,9 +292,17 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
     normalized.forEach((candidate) => {
       try {
+        // Validazione minimale per import: solo vincoli strutturali.
+        // Non si usano le regole UI (depositReceived vs depositAmount,
+        // depositAmount > totalAmount) che scarterebbero dati storici validi.
+        if (!candidate.checkIn || !candidate.checkOut) throw new Error("date mancanti");
+        const ciDate = parseISO(candidate.checkIn);
+        const coDate = parseISO(candidate.checkOut);
+        if (!(ciDate < coDate)) throw new Error("checkOut non successivo a checkIn");
+        if (candidate.totalAmount < 0 || candidate.depositAmount < 0) throw new Error("importi negativi");
         const guestsCount = typeof candidate.guestsCount === "number" && candidate.guestsCount >= 1 ? candidate.guestsCount : 2;
         const payload: BookingInput = {
-          guestName: candidate.guestName,
+          guestName: candidate.guestName || "Ospite",
           lodge: candidate.lodge,
           checkIn: candidate.checkIn,
           checkOut: candidate.checkOut,
@@ -301,9 +314,17 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           depositAmount: candidate.depositAmount,
           depositReceived: candidate.depositReceived,
         };
-        validateBookingPayload(payload);
         ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
-        map.set(candidate.id, candidate);
+        // Merge idempotente: preserva createdAt del booking già esistente.
+        const existing = map.get(candidate.id);
+        const now = new Date().toISOString();
+        map.set(candidate.id, {
+          ...candidate,
+          ...payload,
+          id: candidate.id,
+          createdAt: existing?.createdAt ?? candidate.createdAt ?? now,
+          updatedAt: now,
+        });
         merged += 1;
       } catch {
         skipped += 1;
