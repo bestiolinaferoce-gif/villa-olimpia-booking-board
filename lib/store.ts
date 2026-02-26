@@ -1,19 +1,8 @@
 import { create } from "zustand";
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
-import type { BackupSnapshot, Booking, BookingChannel, BookingFilters, BookingInput, BookingStatus } from "@/lib/types";
-import { BOOKING_CHANNELS, BOOKING_STATUSES } from "@/lib/types";
+import type { BackupSnapshot, Booking, BookingFilters, BookingInput } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
-
-const SEED_BOOKINGS: Booking[] = [
-  { id: "HM4XSWJTKE",  guestName: "Evgueni Spassov",   lodge: "Geranio",    checkIn: "2026-06-25", checkOut: "2026-06-30", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 750.00,   depositAmount: 0, depositReceived: false, createdAt: "2026-02-18T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "HMRWRTKKWH",  guestName: "Roberto Bagatti",   lodge: "Geranio",    checkIn: "2026-06-30", checkOut: "2026-07-15", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 2313.45, depositAmount: 0, depositReceived: false, createdAt: "2026-01-18T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "HMBXDH4EMJ",  guestName: "Christophe Roux",   lodge: "Geranio",    checkIn: "2026-07-16", checkOut: "2026-07-18", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 318.00,  depositAmount: 0, depositReceived: false, createdAt: "2026-02-17T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "HMXMEPZ5KJ",  guestName: "Stefano Canaglia",  lodge: "Lavanda",    checkIn: "2026-07-18", checkOut: "2026-07-25", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-15T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "HMDKAT5QCE",  guestName: "Camilla Saletti",   lodge: "Geranio",    checkIn: "2026-07-20", checkOut: "2026-07-24", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 636.00,  depositAmount: 0, depositReceived: false, createdAt: "2026-02-14T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "HMCECEDTNB",  guestName: "Michela De Munari", lodge: "Lavanda",    checkIn: "2026-07-26", checkOut: "2026-08-02", status: "confirmed", channel: "airbnb",  notes: "", guestsCount: 2, totalAmount: 1060.29, depositAmount: 0, depositReceived: false, createdAt: "2026-02-07T00:00:00.000Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-  { id: "a16f62f3-932c-4932-85d9-d63da692f98a", guestName: "Pietro Miele", lodge: "Frangipane", checkIn: "2026-08-01", checkOut: "2026-08-07", status: "confirmed", channel: "direct", notes: "", guestsCount: 2, totalAmount: 0, depositAmount: 0, depositReceived: false, createdAt: "2026-02-23T13:16:12.657Z", updatedAt: "2026-02-25T12:00:00.000Z" },
-];
 
 type BookingState = {
   bookings: Booking[];
@@ -100,6 +89,8 @@ function persist(bookings: Booking[]): void {
     persistTimer = null;
     const write = () => {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+      // Sync to server
+      fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bookings) }).catch(() => {});
       const raw = window.localStorage.getItem(BACKUP_KEY);
       const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
       const snapshot: BackupSnapshot = {
@@ -154,9 +145,6 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Primo accesso: carica i dati iniziali
-      set({ bookings: SEED_BOOKINGS });
-      persist(SEED_BOOKINGS);
       return;
     }
     try {
@@ -171,6 +159,20 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     } catch {
       set({ bookings: [] });
     }
+    // Sync from server (server is authoritative)
+    fetch('/api/bookings', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((sv) => {
+        if (Array.isArray(sv) && sv.length > 0) {
+          const m = sv.map((b) => ({ ...b, guestsCount: typeof b.guestsCount === 'number' && b.guestsCount >= 1 ? b.guestsCount : 2 }));
+          set({ bookings: m });
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+        } else {
+          const cur = get().bookings;
+          if (cur.length > 0) fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur) }).catch(() => {});
+        }
+      })
+      .catch(() => {});
   },
   setMonth: (month) => set({ currentMonth: format(startOfMonth(month), "yyyy-MM-01") }),
   prevMonth: () => {
@@ -236,48 +238,17 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     persist(next);
   },
   importBookingsMerge: (incoming) => {
-    function parseAmt(v: unknown): number {
-      if (typeof v === "number") return Math.max(0, isFinite(v) ? v : 0);
-      if (typeof v === "string") {
-        // gestisce "1.200,50" (IT) e "1,200.50" (EN)
-        const cleaned = v.includes(",") && v.includes(".")
-          ? v.replace(/\./g, "").replace(",", ".")   // 1.200,50 → 1200.50
-          : v.replace(",", ".");                      // 1200,50 → 1200.50
-        return Math.max(0, parseFloat(cleaned) || 0);
-      }
-      return 0;
-    }
-
     const normalized = incoming
-      .filter((item) => item && item.id)
+      .filter((item) => item && item.id && item.guestName)
       .map((item) => {
-        const raw = item as Record<string, unknown>;
-        // guestsCount: 0 o mancante → 2
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
-        // totalAmount: se il campo è esplicitamente presente nel JSON (anche con valore 0)
-        // lo preserva; fallback su grossEarnings/amountPayout solo se assente.
-        const rawTotal = raw.totalAmount;
-        const hasTotalAmount = rawTotal !== undefined && rawTotal !== null && rawTotal !== "";
-        const totalAmount = hasTotalAmount
-          ? parseAmt(rawTotal)
-          : parseAmt(raw.grossEarnings) || parseAmt(raw.amountPayout);
-        // channel: mappa source:"Airbnb" → "airbnb", ecc.
-        let channel = item.channel as string | undefined;
-        if (!channel && typeof raw.source === "string") {
-          const src = raw.source.toLowerCase();
-          if (src === "airbnb") channel = "airbnb";
-          else if (src.includes("booking")) channel = "booking";
-          else if (src.includes("expedia")) channel = "expedia";
-          else channel = "direct";
-        }
         return {
           ...item,
-          guestName: String(item.guestName ?? "").trim() || "Ospite",
+          guestName: String(item.guestName),
           notes: String(item.notes ?? ""),
           guestsCount,
-          channel: channel || "direct",
-          totalAmount,
-          depositAmount: parseAmt(item.depositAmount),
+          totalAmount: Number(item.totalAmount ?? 0),
+          depositAmount: Number(item.depositAmount ?? 0),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -292,39 +263,23 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
     normalized.forEach((candidate) => {
       try {
-        // Validazione minimale per import: solo vincoli strutturali.
-        // Non si usano le regole UI (depositReceived vs depositAmount,
-        // depositAmount > totalAmount) che scarterebbero dati storici validi.
-        if (!candidate.checkIn || !candidate.checkOut) throw new Error("date mancanti");
-        const ciDate = parseISO(candidate.checkIn);
-        const coDate = parseISO(candidate.checkOut);
-        if (!(ciDate < coDate)) throw new Error("checkOut non successivo a checkIn");
-        if (candidate.totalAmount < 0 || candidate.depositAmount < 0) throw new Error("importi negativi");
         const guestsCount = typeof candidate.guestsCount === "number" && candidate.guestsCount >= 1 ? candidate.guestsCount : 2;
         const payload: BookingInput = {
-          guestName: candidate.guestName || "Ospite",
+          guestName: candidate.guestName,
           lodge: candidate.lodge,
           checkIn: candidate.checkIn,
           checkOut: candidate.checkOut,
-          status: (BOOKING_STATUSES as readonly string[]).includes(candidate.status) ? candidate.status as BookingStatus : "confirmed",
-          channel: (BOOKING_CHANNELS as readonly string[]).includes(candidate.channel) ? candidate.channel as BookingChannel : "direct",
+          status: candidate.status,
+          channel: candidate.channel,
           notes: candidate.notes,
           guestsCount,
           totalAmount: candidate.totalAmount,
           depositAmount: candidate.depositAmount,
           depositReceived: candidate.depositReceived,
         };
+        validateBookingPayload(payload);
         ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
-        // Merge idempotente: preserva createdAt del booking già esistente.
-        const existing = map.get(candidate.id);
-        const now = new Date().toISOString();
-        map.set(candidate.id, {
-          ...candidate,
-          ...payload,
-          id: candidate.id,
-          createdAt: existing?.createdAt ?? candidate.createdAt ?? now,
-          updatedAt: now,
-        });
+        map.set(candidate.id, candidate);
         merged += 1;
       } catch {
         skipped += 1;
