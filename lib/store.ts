@@ -223,9 +223,11 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     const updated: Booking = {
       ...current,
       ...payload,
+      isNew: false,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
       updatedAt: new Date().toISOString(),
+      guestProfile: payload.guestProfile ?? current.guestProfile,
     };
     const next = bookings.map((booking) => (booking.id === id ? updated : booking)).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });

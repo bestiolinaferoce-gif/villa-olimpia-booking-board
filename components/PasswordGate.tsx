@@ -1,15 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const SESSION_KEY = "villa-olimpia:auth";
 
 export function PasswordGate({ children }: { children: React.ReactNode }) {
-  const [unlocked, setUnlocked] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem(SESSION_KEY) === "1";
-  });
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem(SESSION_KEY) === "1") {
+      setUnlocked(true);
+    }
+  }, []);
   const [value, setValue] = useState("");
   const [error, setError] = useState(false);
 
