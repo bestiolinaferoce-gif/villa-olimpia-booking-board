@@ -1,9 +1,9 @@
 "use client";
 
-import { addDays, format, getMonth, getYear, parseISO, startOfMonth } from "date-fns";
+import { addDays, endOfMonth, format, getMonth, getYear, isBefore, parseISO, startOfMonth } from "date-fns";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BookingBoard } from "@/components/BookingBoard";
+import { GanttBoard } from "@/components/GanttBoard";
 import { BookingDialog } from "@/components/BookingDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmailImportDialog } from "@/components/EmailImportDialog";
@@ -11,10 +11,12 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@/components/Toast";
 import { Toolbar } from "@/components/Toolbar";
 import { PasswordGate } from "@/components/PasswordGate";
-import { type Booking, type BookingInput, type Lodge } from "@/lib/types";
+import { KPIPanel } from "@/components/KPIPanel";
+import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types";
 import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
-import { getMonthDays, matchesFilters, toIsoDate } from "@/lib/utils";
+import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
+import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -154,6 +156,66 @@ export default function Home() {
     };
   }, [bookings, filters]);
 
+  const newBookingsCount = useMemo(
+    () => bookings.filter((b) => b.isNew).length,
+    [bookings]
+  );
+
+  const monthKPIs = useMemo(() => {
+    const monthStart = startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
+    const daysInMonth = monthDays.length;
+
+    // Bookings with checkIn in the current month (non-cancelled)
+    const monthBookings = bookings.filter((b) => {
+      if (b.status === "cancelled") return false;
+      const ci = parseISO(b.checkIn);
+      return ci >= monthStart && ci <= monthEnd;
+    });
+
+    const bookingsCount = monthBookings.length;
+    const revenue = monthBookings.reduce((acc, b) => acc + b.totalAmount, 0);
+    const depositsReceived = monthBookings.reduce(
+      (acc, b) => acc + (b.depositReceived ? b.depositAmount : 0),
+      0
+    );
+
+    // Occupancy: count occupied lodge-nights in the month
+    let occupiedLodgeNights = 0;
+    for (const lodge of LODGES) {
+      const lodgeBookings = bookings.filter(
+        (b) => b.lodge === lodge && b.status !== "cancelled"
+      );
+      for (const day of monthDays) {
+        if (lodgeBookings.some((b) => isActiveOnDay(b, day))) {
+          occupiedLodgeNights += 1;
+        }
+      }
+    }
+    const occupancyPct = daysInMonth > 0
+      ? (occupiedLodgeNights / (LODGES.length * daysInMonth)) * 100
+      : 0;
+
+    return { bookingsCount, revenue, depositsReceived, occupancyPct, newBookingsCount };
+  }, [bookings, monthDate, monthDays, newBookingsCount]);
+
+  const lodgeSummaries = useMemo(() => {
+    const filtered = bookings.filter((b) => matchesFilters(b, filters));
+    const firstDay = monthDays[0];
+    const lastDay = monthDays[monthDays.length - 1];
+    const inMonth = firstDay && lastDay
+      ? filtered.filter((b) => {
+          let cursor = new Date(firstDay);
+          while (!isBefore(lastDay, cursor)) {
+            if (isActiveOnDay(b, cursor)) return true;
+            cursor = addDays(cursor, 1);
+          }
+          return false;
+        })
+      : [];
+    return computeLodgeSummaries(monthDate, inMonth);
+  }, [bookings, filters, monthDate, monthDays]);
+
   useEffect(() => {
     const MONTH_ACCENTS: Record<number, string> = {
       0: "#0c4a6e",
@@ -207,6 +269,7 @@ export default function Home() {
         visibleCount={visibleSummary.count}
         visibleTotal={visibleSummary.total}
         visibleDeposits={visibleSummary.deposits}
+        newBookingsCount={newBookingsCount}
       />
 
       <section className="print-title">
@@ -217,9 +280,13 @@ export default function Home() {
         </div>
       </section>
 
+      <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
+
       <ErrorBoundary>
-        <BookingBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
+        <GanttBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
       </ErrorBoundary>
+
+      <MonthSummary monthDate={monthDate} lodgeSummaries={lodgeSummaries} />
 
       <input
         ref={fileInputRef}

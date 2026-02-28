@@ -47,6 +47,18 @@ export const statusBadge: Record<Booking["status"], BadgeStyle> = {
   cancelled: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
 };
 
+export const LODGE_COLORS_MAP: Record<string, string> = {
+  Frangipane: "#8b5cf6",
+  Fiordaliso: "#3b82f6",
+  Giglio: "#10b981",
+  Tulipano: "#f43f5e",
+  Orchidea: "#ec4899",
+  Lavanda: "#a78bfa",
+  Geranio: "#f97316",
+  Gardenia: "#14b8a6",
+  Azalea: "#e11d48",
+};
+
 export const channelBadge: Record<Booking["channel"], BadgeStyle> = {
   direct:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
   airbnb:   { bg: "#fff1f2", text: "#e61e4d", border: "#fecdd3" },

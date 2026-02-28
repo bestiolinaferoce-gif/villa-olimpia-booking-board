@@ -1,9 +1,11 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { differenceInDays, parseISO } from "date-fns";
 import { X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type Lodge } from "@/lib/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type GuestProfile, type Lodge } from "@/lib/types";
 
 type BookingDialogProps = {
   open: boolean;
@@ -51,8 +53,21 @@ export function BookingDialog({
   const [form, setForm] = useState<FormState>(buildDefault(initialLodge, initialDate));
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [showProfile, setShowProfile] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const formRef = useRef(form);
+  formRef.current = form;
 
   const title = useMemo(() => (mode === "edit" ? "Modifica prenotazione" : "Nuova prenotazione"), [mode]);
+
+  useEffect(() => {
+    if (booking?.isNew && mode === "edit" && open) {
+      const timer = setTimeout(() => {
+        onUpdate(booking.id, { ...formRef.current, isNew: false });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [booking?.id, booking?.isNew, mode, open, onUpdate]);
 
   useEffect(() => {
     if (booking) {
@@ -68,6 +83,7 @@ export function BookingDialog({
         totalAmount: booking.totalAmount,
         depositAmount: booking.depositAmount,
         depositReceived: booking.depositReceived,
+        guestProfile: booking.guestProfile,
       });
       setError("");
       setFieldErrors({});
@@ -91,6 +107,57 @@ export function BookingDialog({
     setError("");
     setFieldErrors({});
   }, [booking, open, initialLodge, initialDate, initialPrefill]);
+
+  function changeProfile<K extends keyof GuestProfile>(key: K, value: GuestProfile[K]) {
+    setForm((prev) => ({
+      ...prev,
+      guestProfile: { ...(prev.guestProfile ?? {}), [key]: value },
+    }));
+  }
+
+  function exportAlloggiati(b: Booking) {
+    const p = b.guestProfile ?? {};
+    const docTypeMap: Record<string, string> = {
+      CARTA_IDENTITA: "IDENT",
+      PASSAPORTO: "PASOR",
+      PATENTE: "PATEG",
+      PERMESSO_SOGGIORNO: "PERMS",
+    };
+    const fmtDate = (d?: string) => {
+      if (!d) return "          ";
+      const [y, m, g] = d.split("-");
+      return `${g}/${m}/${y}`;
+    };
+    const pad = (s: string, len: number) => s.substring(0, len).padEnd(len, " ");
+    const padNum = (n: number, len: number) => String(n).padStart(len, "0");
+    const nights = differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn));
+    const gender = p.gender === "M" ? "1" : p.gender === "F" ? "2" : "9";
+    const docType = docTypeMap[p.documentType ?? ""] ?? "IDENT";
+    const row = [
+      "16",
+      fmtDate(b.checkIn),
+      padNum(nights, 4),
+      pad(p.surname ?? b.guestName, 50),
+      pad(p.firstName ?? "", 30),
+      gender,
+      fmtDate(p.birthDate),
+      pad(p.birthPlace ?? "", 9),
+      pad(p.birthProvince ?? "  ", 2),
+      pad(p.birthCountry ?? "Z000", 9),
+      pad(p.nationality ?? "Z000", 9),
+      pad(docType, 5),
+      pad(p.documentNumber ?? "", 20),
+      pad(p.documentIssuePlace ?? "", 9),
+    ].join("");
+    const filename = `alloggiati_${b.guestName.replace(/\s+/g, "_")}_${b.checkIn}.txt`;
+    const blob = new Blob([row + "\r\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function mapErrorToField(message: string): keyof FormState | null {
     if (message.includes("nome ospite")) return "guestName";
@@ -136,6 +203,7 @@ export function BookingDialog({
   }
 
   return (
+    <>
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
@@ -149,113 +217,134 @@ export function BookingDialog({
             </Dialog.Close>
           </div>
 
-          <div className="form-grid">
-            <label>
-              Ospite
-              <input value={form.guestName} onChange={(e) => change("guestName", e.target.value)} placeholder="Nome e cognome" />
-              {fieldErrors.guestName && <span className="field-error">{fieldErrors.guestName}</span>}
-            </label>
-            <label>
-              Lodge
-              <select value={form.lodge} onChange={(e) => change("lodge", e.target.value as Lodge)}>
-                {LODGES.map((lodge) => (
-                  <option key={lodge} value={lodge}>
-                    {lodge}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Check-in
-              <input type="date" value={form.checkIn} onChange={(e) => change("checkIn", e.target.value)} />
-              {fieldErrors.checkIn && <span className="field-error">{fieldErrors.checkIn}</span>}
-            </label>
-            <label>
-              Check-out
-              <input type="date" value={form.checkOut} onChange={(e) => change("checkOut", e.target.value)} />
-              {fieldErrors.checkOut && <span className="field-error">{fieldErrors.checkOut}</span>}
-            </label>
-            <label>
-              Stato
-              <select value={form.status} onChange={(e) => change("status", e.target.value as BookingStatus)}>
-                {BOOKING_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Canale
-              <select value={form.channel} onChange={(e) => change("channel", e.target.value as BookingInput["channel"])}>
-                {BOOKING_CHANNELS.map((channel) => (
-                  <option key={channel} value={channel}>
-                    {channel}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              N. ospiti
-              <input
-                type="number"
-                min={1}
-                value={form.guestsCount}
-                onChange={(e) => change("guestsCount", Math.max(1, parseInt(e.target.value || "1", 10)))}
-              />
-              {fieldErrors.guestsCount && <span className="field-error">{fieldErrors.guestsCount}</span>}
-            </label>
-            <label>
-              Totale
-              <input
-                type="number"
-                min={0}
-                value={form.totalAmount}
-                onChange={(e) => change("totalAmount", Number(e.target.value || 0))}
-              />
-            </label>
-            <label>
-              Caparra
-              <input
-                type="number"
-                min={0}
-                value={form.depositAmount}
-                onChange={(e) => change("depositAmount", Number(e.target.value || 0))}
-              />
-              {fieldErrors.depositAmount && <span className="field-error">{fieldErrors.depositAmount}</span>}
-            </label>
-            <label className="checkbox-line">
-              <input
-                type="checkbox"
-                checked={form.depositReceived}
-                onChange={(e) => change("depositReceived", e.target.checked)}
-              />
-              Caparra ricevuta
-            </label>
-            <label className="full-width">
-              Note
-              <textarea value={form.notes} onChange={(e) => change("notes", e.target.value)} rows={4} />
-            </label>
+          <div style={{ display: "grid", gap: "12px" }}>
+            <div className="form-section">
+              <p className="form-section-title">Ospite &amp; Alloggio</p>
+              <div className="form-grid">
+                <label>
+                  Ospite
+                  <input value={form.guestName} onChange={(e) => change("guestName", e.target.value)} placeholder="Nome e cognome" />
+                  {fieldErrors.guestName && <span className="field-error">{fieldErrors.guestName}</span>}
+                </label>
+                <label>Lodge
+                  <select value={form.lodge} onChange={(e) => change("lodge", e.target.value as Lodge)}>
+                    {LODGES.map((l) => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </label>
+                <label>
+                  N. ospiti
+                  <input type="number" min={1} value={form.guestsCount} onChange={(e) => change("guestsCount", Math.max(1, parseInt(e.target.value || "1", 10)))} />
+                  {fieldErrors.guestsCount && <span className="field-error">{fieldErrors.guestsCount}</span>}
+                </label>
+                <label>Canale
+                  <select value={form.channel} onChange={(e) => change("channel", e.target.value as BookingInput["channel"])}>
+                    {BOOKING_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="form-section">
+              <p className="form-section-title">Date &amp; Stato</p>
+              <div className="form-grid">
+                <label>Check-in
+                  <input type="date" value={form.checkIn} onChange={(e) => change("checkIn", e.target.value)} />
+                  {fieldErrors.checkIn && <span className="field-error">{fieldErrors.checkIn}</span>}
+                </label>
+                <label>Check-out
+                  <input type="date" value={form.checkOut} onChange={(e) => change("checkOut", e.target.value)} />
+                  {fieldErrors.checkOut && <span className="field-error">{fieldErrors.checkOut}</span>}
+                </label>
+                <label>Stato
+                  <select value={form.status} onChange={(e) => change("status", e.target.value as BookingStatus)}>
+                    {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="form-section">
+              <p className="form-section-title">Riepilogo Economico</p>
+              <div className="form-grid">
+                <label>Totale
+                  <input type="number" min={0} value={form.totalAmount} onChange={(e) => change("totalAmount", Number(e.target.value || 0))} />
+                </label>
+                <label>Caparra
+                  <input type="number" min={0} value={form.depositAmount} onChange={(e) => change("depositAmount", Number(e.target.value || 0))} />
+                  {fieldErrors.depositAmount && <span className="field-error">{fieldErrors.depositAmount}</span>}
+                </label>
+                <label className="checkbox-line">
+                  <input type="checkbox" checked={form.depositReceived} onChange={(e) => change("depositReceived", e.target.checked)} />
+                  Caparra ricevuta
+                </label>
+                <label>
+                  Residuo da incassare
+                  <input readOnly value={`€ ${Math.max(0, form.totalAmount - form.depositAmount).toFixed(2)}`} style={{ background: "var(--bg)", color: "var(--muted)", cursor: "default" }} />
+                </label>
+              </div>
+            </div>
+            <div className="form-section">
+              <p className="form-section-title">Note</p>
+              <label className="full-width">
+                <textarea value={form.notes} onChange={(e) => change("notes", e.target.value)} rows={3} />
+              </label>
+            </div>
+            <div className="form-section">
+              <button type="button" className="section-toggle" onClick={() => setShowProfile((v) => !v)}>
+                {showProfile ? "▼" : "▶"} Anagrafica &amp; Documenti
+                {form.guestProfile?.fiscalCode && <span className="profile-complete-badge">✓ completa</span>}
+              </button>
+              {showProfile && (
+                <div className="form-grid profile-grid">
+                  <label>Cognome <input value={form.guestProfile?.surname ?? ""} onChange={(e) => changeProfile("surname", e.target.value)} /></label>
+                  <label>Nome <input value={form.guestProfile?.firstName ?? ""} onChange={(e) => changeProfile("firstName", e.target.value)} /></label>
+                  <label>Sesso
+                    <select value={form.guestProfile?.gender ?? ""} onChange={(e) => changeProfile("gender", e.target.value as "M" | "F" | "")}>
+                      <option value="">—</option><option value="M">M</option><option value="F">F</option>
+                    </select>
+                  </label>
+                  <label>Data di nascita <input type="date" value={form.guestProfile?.birthDate ?? ""} onChange={(e) => changeProfile("birthDate", e.target.value)} /></label>
+                  <label>Comune di nascita <input value={form.guestProfile?.birthPlace ?? ""} onChange={(e) => changeProfile("birthPlace", e.target.value)} /></label>
+                  <label>Provincia (sigla) <input maxLength={2} placeholder="MI" value={form.guestProfile?.birthProvince ?? ""} onChange={(e) => changeProfile("birthProvince", e.target.value.toUpperCase())} /></label>
+                  <label>Stato di nascita <input placeholder="Italia" value={form.guestProfile?.birthCountry ?? ""} onChange={(e) => changeProfile("birthCountry", e.target.value)} /></label>
+                  <label>Cittadinanza <input placeholder="Italiana" value={form.guestProfile?.nationality ?? ""} onChange={(e) => changeProfile("nationality", e.target.value)} /></label>
+                  <label>Codice Fiscale <input maxLength={16} placeholder="RSSMRA80A01H501Z" value={form.guestProfile?.fiscalCode ?? ""} onChange={(e) => changeProfile("fiscalCode", e.target.value.toUpperCase())} style={{ fontFamily: "monospace", letterSpacing: "0.08em" }} /></label>
+                  <label className="full-width">Residenza (via, n°, città, CAP) <input placeholder="Via Roma 1, 20100 Milano" value={form.guestProfile?.residence ?? ""} onChange={(e) => changeProfile("residence", e.target.value)} /></label>
+                  <label>Tipo documento
+                    <select value={form.guestProfile?.documentType ?? ""} onChange={(e) => changeProfile("documentType", e.target.value as GuestProfile["documentType"])}>
+                      <option value="">— Seleziona —</option>
+                      <option value="CARTA_IDENTITA">Carta d&apos;identità</option>
+                      <option value="PASSAPORTO">Passaporto</option>
+                      <option value="PATENTE">Patente</option>
+                      <option value="PERMESSO_SOGGIORNO">Permesso di soggiorno</option>
+                    </select>
+                  </label>
+                  <label>Numero documento <input placeholder="AB1234567" value={form.guestProfile?.documentNumber ?? ""} onChange={(e) => changeProfile("documentNumber", e.target.value.toUpperCase())} style={{ fontFamily: "monospace" }} /></label>
+                  <label>Luogo rilascio <input placeholder="Comune di Milano" value={form.guestProfile?.documentIssuePlace ?? ""} onChange={(e) => changeProfile("documentIssuePlace", e.target.value)} /></label>
+                  <label>Data rilascio <input type="date" value={form.guestProfile?.documentIssueDate ?? ""} onChange={(e) => changeProfile("documentIssueDate", e.target.value)} /></label>
+                </div>
+              )}
+            </div>
           </div>
 
           {error ? <p className="error-box">{error}</p> : null}
 
           <div className="dialog-actions">
-            {mode === "edit" && booking ? (
-              <button
-                type="button"
-                className="danger-btn"
-                onClick={() => {
-                  onDelete(booking.id);
-                  onClose();
-                }}
-              >
-                Elimina
-              </button>
-            ) : (
-              <span />
-            )}
-            <div className="right-actions">
+            <div className="left-actions">
+              {mode === "edit" && booking ? (
+                <>
+                  <button type="button" className="danger-btn" onClick={() => setDeleteConfirm(true)}>
+                    Elimina
+                  </button>
+                  {booking?.guestProfile?.surname && (
+                    <button type="button" className="alloggiati-btn" onClick={() => exportAlloggiati(booking)} title="Prepara file per Portale Alloggiati Web">
+                      📋 Alloggiati
+                    </button>
+                  )}
+                </>
+              ) : (
+                <span />
+              )}
+            </div>
+            <div className="right-actions" style={{ marginLeft: "auto" }}>
               <button type="button" className="ghost-btn" onClick={onClose}>
                 Annulla
               </button>
@@ -267,5 +356,21 @@ export function BookingDialog({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    <ConfirmDialog
+      open={deleteConfirm}
+      title="Elimina prenotazione"
+      message={booking ? `Vuoi eliminare la prenotazione di ${booking.guestName}? L'azione è irreversibile.` : ""}
+      confirmLabel="Elimina"
+      onConfirm={() => {
+        if (booking) {
+          onDelete(booking.id);
+          onClose();
+        }
+        setDeleteConfirm(false);
+      }}
+      onClose={() => setDeleteConfirm(false)}
+    />
+    </>
   );
 }

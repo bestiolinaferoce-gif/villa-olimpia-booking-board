@@ -9,14 +9,18 @@ type SummaryBarProps = {
   count: number;
   total: number;
   deposits: number;
+  newBookingsCount?: number;
 };
 
-export function SummaryBar({ count, total, deposits }: SummaryBarProps) {
+export function SummaryBar({ count, total, deposits, newBookingsCount = 0 }: SummaryBarProps) {
   return (
     <div className="meta-row">
-      <div className="summary-card">
+      <div className="summary-card summary-card-prenotazioni">
         <CalendarDays size={16} />
         <span>Prenotazioni visibili: {count}</span>
+        {newBookingsCount > 0 && (
+          <span className="kpi-new-badge">+{newBookingsCount} nuove</span>
+        )}
       </div>
       <div className="summary-card">
         <Filter size={16} />

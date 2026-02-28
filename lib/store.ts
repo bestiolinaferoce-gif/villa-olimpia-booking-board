@@ -201,6 +201,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     const booking: Booking = {
       id: uuidv4(),
       ...payload,
+      isNew: true,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
       guestsCount: payload.guestsCount,
@@ -223,7 +224,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     const updated: Booking = {
       ...current,
       ...payload,
-      isNew: false,
+      isNew: payload.isNew ?? false,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
       updatedAt: new Date().toISOString(),

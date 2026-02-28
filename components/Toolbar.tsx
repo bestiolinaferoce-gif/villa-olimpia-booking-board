@@ -34,6 +34,7 @@ type ToolbarProps = {
   visibleCount: number;
   visibleTotal: number;
   visibleDeposits: number;
+  newBookingsCount?: number;
 };
 
 export function Toolbar({
@@ -57,6 +58,7 @@ export function Toolbar({
   visibleCount,
   visibleTotal,
   visibleDeposits,
+  newBookingsCount = 0,
 }: ToolbarProps) {
   return (
     <section className="toolbar no-print">
@@ -116,7 +118,7 @@ export function Toolbar({
         </div>
       </div>
 
-      <SummaryBar count={visibleCount} total={visibleTotal} deposits={visibleDeposits} />
+      <SummaryBar count={visibleCount} total={visibleTotal} deposits={visibleDeposits} newBookingsCount={newBookingsCount} />
     </section>
   );
 }

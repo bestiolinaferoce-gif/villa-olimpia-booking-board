@@ -523,6 +523,413 @@ textarea {
   border-radius: 12px;
 }
 
+/* === GANTT BOARD (CURSOR_TASK_MASTER) === */
+.gantt-wrap {
+  --lodge-col: 180px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+}
+
+.gantt-header {
+  display: grid;
+  grid-template-columns: var(--lodge-col) repeat(auto-fill, minmax(34px, 1fr));
+  background: var(--accent);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.gantt-header-label {
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.gantt-day-header {
+  padding: 8px 4px;
+  text-align: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+.gantt-day-header:last-child { border-right: none; }
+
+.gantt-day-num {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.gantt-day-name {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.gantt-day-weekend .gantt-day-num { color: #bfdbfe; }
+.gantt-day-today { background: rgba(255, 255, 255, 0.15); }
+
+.gantt-body { overflow-x: auto; }
+
+.gantt-row {
+  display: grid;
+  border-bottom: 1px solid var(--line);
+  min-height: 52px;
+}
+.gantt-row:last-child { border-bottom: none; }
+
+.gantt-lodge-label {
+  min-width: 150px;
+  max-width: 180px;
+  width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  overflow: hidden;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+}
+
+.gantt-lodge-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: block;
+}
+
+.gantt-lodge-name {
+  display: block !important;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.gantt-cells-area {
+  display: grid;
+  position: relative;
+  min-height: 52px;
+}
+
+.gantt-cell {
+  min-height: 52px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.gantt-cell-today { background: var(--today-bg); }
+.gantt-cell-weekend { background: rgba(0, 0, 0, 0.02); }
+
+.gantt-add-btn {
+  font-size: 1.2rem;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.gantt-bar {
+  position: absolute;
+  height: 36px;
+  top: 8px;
+  border-radius: 8px;
+  border-left: 3px solid;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+  min-width: 60px;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.gantt-bar:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.gantt-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.gantt-bar-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gantt-bar-meta { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.gantt-bar-channel {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  50% { opacity: 0.85; transform: scale(1.06); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+.gantt-bar-new-badge {
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  background: #10b981;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  animation: badgePulse 1.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.kpi-new-badge {
+  display: inline-block;
+  margin-top: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  animation: badgePulse 1.4s ease-in-out infinite;
+}
+
+/* ── KPI Panel ────────────────────────────────── */
+.kpi-panel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .kpi-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .kpi-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpi-card {
+  --kpi-accent: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--kpi-accent);
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--kpi-accent);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+@media print {
+  .kpi-panel {
+    display: none;
+  }
+}
+
+.summary-card-prenotazioni {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* Anagrafica & Documenti */
+.section-toggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.15s;
+}
+.section-toggle:hover { color: var(--text); }
+
+.profile-complete-badge {
+  margin-left: auto;
+  font-size: 11px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.profile-grid {
+  padding-top: 12px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.alloggiati-btn {
+  padding: 8px 14px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.alloggiati-btn:hover {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.form-section {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+.form-section-title {
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-actions .left-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.gantt-today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.month-summary {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.month-summary-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.summary-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 8px 8px;
+  border-bottom: 1.5px solid var(--line);
+}
+.summary-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.summary-table tr:last-child td {
+  border-bottom: none;
+  font-weight: 700;
+}
+.occ-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  margin-top: 3px;
+}
+.occ-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
 @media print {
   :root {
     --accent: #6b7280;
