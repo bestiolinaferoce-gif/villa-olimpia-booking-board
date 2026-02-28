@@ -9,7 +9,11 @@ type BookingState = {
   currentMonth: string;
   filters: BookingFilters;
   monthTheme: boolean;
+  serverVersion: number;
+  syncError: boolean;
   load: () => void;
+  startPolling: () => () => void;
+  stopPolling: () => void;
   setMonthTheme: (value: boolean) => void;
   setMonth: (month: Date) => void;
   prevMonth: () => void;
@@ -75,39 +79,11 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
   }
 }
 
-// Debounce timer per persist: mutazioni rapide consecutive producono una sola scrittura.
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
-
-function persist(bookings: Booking[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (persistTimer !== null) {
-    clearTimeout(persistTimer);
-  }
-  persistTimer = setTimeout(() => {
-    persistTimer = null;
-    const write = () => {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-      // Sync to server
-      fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bookings) }).catch(() => {});
-      const raw = window.localStorage.getItem(BACKUP_KEY);
-      const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
-      const snapshot: BackupSnapshot = {
-        createdAt: new Date().toISOString(),
-        bookings,
-      };
-      const merged = [snapshot, ...current].slice(0, 10);
-      window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
-    };
-    // requestIdleCallback: scrive quando il browser è idle (Chrome/Firefox).
-    // Fallback sincrono su Safari e ambienti senza supporto.
-    if (typeof requestIdleCallback !== "undefined") {
-      requestIdleCallback(write);
-    } else {
-      write();
-    }
-  }, 250);
+function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Booking[] {
+  return arr.map((item) => ({
+    ...item,
+    guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
+  })) as Booking[];
 }
 
 function persistSettings(settings: { monthTheme: boolean }): void {
@@ -117,7 +93,39 @@ function persistSettings(settings: { monthTheme: boolean }): void {
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-export const useBookingStore = create<BookingState>((set, get) => ({
+export const useBookingStore = create<BookingState>((set, get) => {
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function persist(bookings: Booking[]): void {
+    if (typeof window === "undefined") return;
+    if (persistTimer !== null) clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      const write = () => {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+        fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookings }),
+        })
+          .then(async (r) => {
+            if (r.ok) {
+              const res = (await r.json()) as { ok: boolean; v?: number };
+              if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+            }
+          })
+          .catch(() => set({ syncError: true }));
+        const raw = window.localStorage.getItem(BACKUP_KEY);
+        const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
+        const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
+        window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+      };
+      if (typeof requestIdleCallback !== "undefined") requestIdleCallback(write);
+      else write();
+    }, 250);
+  }
+
+  return {
   bookings: [],
   currentMonth: format(startOfMonth(new Date()), "yyyy-MM-01"),
   filters: {
@@ -128,52 +136,78 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   },
   monthTheme: true,
   toast: null,
+  serverVersion: 0,
+  syncError: false,
   load: () => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
     const rawSettings = window.localStorage.getItem(SETTINGS_KEY);
     if (rawSettings) {
       try {
-        const settings = JSON.parse(rawSettings) as { monthTheme?: boolean };
-        if (typeof settings.monthTheme === "boolean") {
-          set({ monthTheme: settings.monthTheme });
-        }
-      } catch {
-        // ignore malformed settings
-      }
+        const s = JSON.parse(rawSettings) as { monthTheme?: boolean };
+        if (typeof s.monthTheme === "boolean") set({ monthTheme: s.monthTheme });
+      } catch { /* ignore */ }
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
+    if (raw) {
+      try {
+        const cached = JSON.parse(raw) as Array<Booking & { guestsCount?: number }>;
+        set({ bookings: migrateBookings(cached) });
+      } catch { /* ignore */ }
     }
-    try {
-      const parsed = JSON.parse(raw) as Array<Booking & { guestsCount?: number }>;
-      const migrated = parsed.map((item) => ({
-        ...item,
-        guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
-      })) as Booking[];
-      const needsPersist = migrated.some((b, i) => typeof parsed[i]?.guestsCount !== "number");
-      set({ bookings: migrated });
-      if (needsPersist) persist(migrated);
-    } catch {
-      set({ bookings: [] });
-    }
-    // Sync from server (server is authoritative)
-    fetch('/api/bookings', { cache: 'no-store' })
+    fetch("/api/bookings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((sv) => {
-        if (Array.isArray(sv) && sv.length > 0) {
-          const m = sv.map((b) => ({ ...b, guestsCount: typeof b.guestsCount === 'number' && b.guestsCount >= 1 ? b.guestsCount : 2 }));
-          set({ bookings: m });
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+      .then((payload: { v: number; ts: string; data: Booking[] } | null) => {
+        if (!payload) return;
+        const data = Array.isArray(payload) ? payload : (payload.data ?? []);
+        if (data.length > 0) {
+          const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
+          set({ bookings: migrated, serverVersion: payload.v ?? 0, syncError: false });
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
         } else {
           const cur = get().bookings;
-          if (cur.length > 0) fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur) }).catch(() => {});
+          if (cur.length > 0) {
+            fetch("/api/bookings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bookings: cur }),
+            }).catch(() => {});
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => set({ syncError: true }));
   },
+  startPolling: () => {
+    const INTERVAL = 30_000;
+    let active = true;
+    const poll = async () => {
+      if (!active || typeof window === "undefined") return;
+      try {
+        const res = await fetch("/api/bookings/version", { cache: "no-store" });
+        if (!res.ok) throw new Error("poll failed");
+        const { v } = (await res.json()) as { v: number };
+        const currentVersion = get().serverVersion;
+        if (v > currentVersion) {
+          const full = await fetch("/api/bookings", { cache: "no-store" });
+          if (!full.ok) throw new Error("full fetch failed");
+          const payload = (await full.json()) as { v?: number; data?: Booking[] } | Booking[];
+          const data = Array.isArray(payload) ? payload : (payload.data ?? []);
+          const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
+          const newV = Array.isArray(payload) ? 0 : (payload.v ?? v);
+          set({ bookings: migrated, serverVersion: newV, syncError: false });
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          }
+        }
+      } catch { /* silent — non aggiornare syncError da polling */ }
+      if (active) setTimeout(poll, INTERVAL);
+    };
+    const firstTimer = setTimeout(poll, 5_000);
+    return () => {
+      active = false;
+      clearTimeout(firstTimer);
+    };
+  },
+  stopPolling: () => { /* gestito dall'active flag nel cleanup di startPolling */ },
   setMonth: (month) => set({ currentMonth: format(startOfMonth(month), "yyyy-MM-01") }),
   prevMonth: () => {
     const month = parseISO(get().currentMonth);
@@ -295,4 +329,5 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     return { merged, skipped };
   },
   exportBookings: () => get().bookings,
-}));
+  };
+});

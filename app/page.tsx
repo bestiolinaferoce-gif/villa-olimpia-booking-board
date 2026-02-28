@@ -41,9 +41,11 @@ export default function Home() {
       setShowCancelled: s.setShowCancelled,
     }))
   );
-  const { load, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast } = useBookingStore(
+  const { load, startPolling, syncError, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast } = useBookingStore(
     useShallow((s) => ({
       load: s.load,
+      startPolling: s.startPolling,
+      syncError: s.syncError,
       addBooking: s.addBooking,
       updateBooking: s.updateBooking,
       deleteBooking: s.deleteBooking,
@@ -63,6 +65,11 @@ export default function Home() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const stop = startPolling();
+    return stop;
+  }, [startPolling]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -342,6 +349,11 @@ export default function Home() {
         onClose={() => setImportConfirm(null)}
       />
 
+      {syncError && (
+        <div className="sync-error-badge" role="status">
+          ⚠ Sincronizzazione offline
+        </div>
+      )}
       <Toast />
     </main>
     </PasswordGate>
