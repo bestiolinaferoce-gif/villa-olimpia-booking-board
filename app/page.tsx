@@ -17,6 +17,7 @@ import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
+import { MigrationHelper } from "@/components/MigrationHelper";
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -41,17 +42,21 @@ export default function Home() {
       setShowCancelled: s.setShowCancelled,
     }))
   );
-  const { load, startPolling, syncError, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast } = useBookingStore(
+  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, syncLocalToCloud } = useBookingStore(
     useShallow((s) => ({
       load: s.load,
       startPolling: s.startPolling,
       syncError: s.syncError,
+      hasNewBookings: s.hasNewBookings,
+      clearNewBookingsNotification: s.clearNewBookingsNotification,
       addBooking: s.addBooking,
       updateBooking: s.updateBooking,
       deleteBooking: s.deleteBooking,
       importBookingsMerge: s.importBookingsMerge,
       exportBookings: s.exportBookings,
       showToast: s.showToast,
+      forceSyncToCloud: s.forceSyncToCloud,
+      syncLocalToCloud: s.syncLocalToCloud,
     }))
   );
 
@@ -154,6 +159,13 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  function onCopyIcal() {
+    const url = `${window.location.origin}/api/calendar`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("Link iCal copiato! Incollalo in Google Calendar / Airbnb / iPhone.", "success");
+    });
+  }
+
   const visibleSummary = useMemo(() => {
     const filtered = bookings.filter((booking) => matchesFilters(booking, filters));
     return {
@@ -254,6 +266,7 @@ export default function Home() {
 
   return (
     <PasswordGate>
+    <MigrationHelper />
     <main className="page-root">
       <Toolbar
         monthDate={monthDate}
@@ -273,6 +286,12 @@ export default function Home() {
         onEmailImport={() => setEmailImportOpen(true)}
         onImportClick={onImportClick}
         onExport={onExport}
+        onCopyIcal={onCopyIcal}
+        onForceSync={() => forceSyncToCloud()}
+        onSyncLocal={() => syncLocalToCloud()}
+        syncError={syncError}
+        hasNewBookings={hasNewBookings}
+        onClearNotification={clearNewBookingsNotification}
         visibleCount={visibleSummary.count}
         visibleTotal={visibleSummary.total}
         visibleDeposits={visibleSummary.deposits}

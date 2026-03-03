@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Download, Mail, Plus, Printer, Upload } from "lucide-react";
+import { Calendar, CloudUpload, Download, Mail, Plus, Printer, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
@@ -30,11 +30,17 @@ type ToolbarProps = {
   onEmailImport: () => void;
   onImportClick: () => void;
   onExport: () => void;
+  onCopyIcal: () => void;
+  onForceSync: () => void;
+  onSyncLocal?: () => void;
+  syncError: boolean;
+  hasNewBookings?: boolean;
+  onClearNotification?: () => void;
+  newBookingsCount?: number;
   // summary bar
   visibleCount: number;
   visibleTotal: number;
   visibleDeposits: number;
-  newBookingsCount?: number;
 };
 
 export function Toolbar({
@@ -55,6 +61,12 @@ export function Toolbar({
   onEmailImport,
   onImportClick,
   onExport,
+  onCopyIcal,
+  onForceSync,
+  onSyncLocal,
+  syncError,
+  hasNewBookings = false,
+  onClearNotification,
   visibleCount,
   visibleTotal,
   visibleDeposits,
@@ -111,6 +123,53 @@ export function Toolbar({
             <Download size={15} />
             Export JSON
           </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            title="Copia URL iCal"
+            onClick={onCopyIcal}
+          >
+            <Calendar size={15} />
+            iCal
+          </button>
+          <button
+            type="button"
+            className={syncError ? "ghost-btn danger-btn" : "ghost-btn"}
+            title={syncError ? "Sync offline — clicca per ritentare il caricamento" : "Forza caricamento dati sul cloud"}
+            onClick={onForceSync}
+          >
+            <CloudUpload size={15} />
+            {syncError ? "Sync ⚠" : "Sync"}
+          </button>
+          {onSyncLocal && (
+            <button
+              type="button"
+              className="ghost-btn"
+              title="Sincronizza prenotazioni locali al cloud"
+              onClick={onSyncLocal}
+            >
+              ☁️ Sync locale
+            </button>
+          )}
+          {hasNewBookings && (
+            <button
+              type="button"
+              className="btn-notify"
+              onClick={onClearNotification}
+              title={`${newBookingsCount} nuova/e prenotazione/i`}
+            >
+              <span className="notify-dot" />
+              🔔 {newBookingsCount > 0 ? `+${newBookingsCount}` : ""} Nuova
+            </button>
+          )}
+          {syncError && (
+            <span
+              className="sync-error"
+              title="Sincronizzazione fallita — dati mostrati potrebbero non essere aggiornati"
+            >
+              ⚠ Offline
+            </span>
+          )}
           <button type="button" className="ghost-btn" onClick={() => window.print()}>
             <Printer size={15} />
             Stampa

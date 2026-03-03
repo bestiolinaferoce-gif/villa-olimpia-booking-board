@@ -11,9 +11,11 @@ type BookingState = {
   monthTheme: boolean;
   serverVersion: number;
   syncError: boolean;
+  hasNewBookings: boolean;
   load: () => void;
   startPolling: () => () => void;
   stopPolling: () => void;
+  clearNewBookingsNotification: () => void;
   setMonthTheme: (value: boolean) => void;
   setMonth: (month: Date) => void;
   prevMonth: () => void;
@@ -27,6 +29,8 @@ type BookingState = {
   deleteBooking: (id: string) => void;
   importBookingsMerge: (incoming: Booking[]) => { merged: number; skipped: number };
   exportBookings: () => Booking[];
+  forceSyncToCloud: () => Promise<void>;
+  syncLocalToCloud: () => Promise<{ merged: number; total: number }>;
   toast: { message: string; type: "success" | "error" } | null;
   showToast: (message: string, type?: "success" | "error") => void;
   clearToast: () => void;
@@ -138,6 +142,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
   toast: null,
   serverVersion: 0,
   syncError: false,
+  hasNewBookings: false,
   load: () => {
     if (typeof window === "undefined") return;
     const rawSettings = window.localStorage.getItem(SETTINGS_KEY);
@@ -193,7 +198,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
           const data = Array.isArray(payload) ? payload : (payload.data ?? []);
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
           const newV = Array.isArray(payload) ? 0 : (payload.v ?? v);
-          set({ bookings: migrated, serverVersion: newV, syncError: false });
+          set({ bookings: migrated, serverVersion: newV, syncError: false, hasNewBookings: true });
           if (typeof window !== "undefined") {
             window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
           }
@@ -225,6 +230,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     set({ monthTheme: value });
     persistSettings({ monthTheme: value });
   },
+  clearNewBookingsNotification: () => set({ hasNewBookings: false }),
   showToast: (message, type = "success") => set({ toast: { message, type } }),
   clearToast: () => set({ toast: null }),
   addBooking: (payload) => {
@@ -329,5 +335,75 @@ export const useBookingStore = create<BookingState>((set, get) => {
     return { merged, skipped };
   },
   exportBookings: () => get().bookings,
+  forceSyncToCloud: async () => {
+    if (typeof window === "undefined") return;
+    const cur = get().bookings;
+    if (cur.length === 0) {
+      get().showToast("Nessuna prenotazione da caricare.", "error");
+      return;
+    }
+    try {
+      const r = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookings: cur }),
+      });
+      if (r.ok) {
+        const res = (await r.json()) as { ok: boolean; v?: number };
+        if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+        get().showToast(`✓ ${cur.length} prenotazioni caricate sul cloud (v${res.v ?? "?"}).`);
+      } else {
+        get().showToast("Errore durante il caricamento sul cloud.", "error");
+      }
+    } catch {
+      set({ syncError: true });
+      get().showToast("Errore di rete durante il sync.", "error");
+    }
+  },
+  syncLocalToCloud: async () => {
+    let local: Booking[] = [];
+    try {
+      const raw =
+        typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      if (raw) local = JSON.parse(raw) as Booking[];
+    } catch {
+      local = [];
+    }
+
+    if (local.length === 0) {
+      get().showToast("Nessuna prenotazione locale da sincronizzare.", "error");
+      return { merged: 0, total: 0 };
+    }
+
+    try {
+      const res = await fetch("/api/bookings/merge-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookings: local }),
+      });
+      const data = (await res.json()) as {
+        merged?: number;
+        total?: number;
+        error?: string;
+      };
+
+      if (res.ok) {
+        get().showToast(
+          `Sync completata: ${data.merged ?? 0} nuove prenotazioni aggiunte (totale: ${data.total ?? 0}).`
+        );
+        await get().load();
+        return { merged: data.merged ?? 0, total: data.total ?? 0 };
+      } else {
+        get().showToast(
+          "Errore durante la sincronizzazione: " + (data.error ?? "unknown"),
+          "error"
+        );
+        return { merged: 0, total: 0 };
+      }
+    } catch {
+      get().showToast("Errore di rete durante la sincronizzazione.", "error");
+      return { merged: 0, total: 0 };
+    }
+  },
   };
 });
