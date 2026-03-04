@@ -108,10 +108,12 @@ function renderLodgeCells(
   while (i < monthDays.length) {
     const info = cellMap.get(i);
     if (!info) {
+      const isToday = isSameDay(monthDays[i], today);
+      const isWeekend = getDay(monthDays[i]) === 0 || getDay(monthDays[i]) === 6;
       cells.push(
         <div
           key={i}
-          className="gantt-cell gantt-cell-empty"
+          className={`gantt-cell gantt-cell-empty${isToday ? " gantt-cell-today" : ""}${isWeekend ? " gantt-cell-weekend" : ""}`}
           onClick={() => onCreate(lodge, monthDays[i])}
         >
           <span className="gantt-add">+</span>

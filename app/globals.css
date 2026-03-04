@@ -529,7 +529,8 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: clip;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
 }
 
@@ -665,8 +666,8 @@ textarea {
   transition: filter 0.1s;
 }
 .gantt-cell-booked:hover { filter: brightness(0.93); }
-.gantt-cell-today { background: var(--today-bg) !important; }
-.gantt-cell-weekend { background: #fafafa !important; }
+.gantt-cell-today { background: var(--today-bg); }
+.gantt-cell-weekend { background: #fafafa; }
 
 .gantt-cell-name { flex-shrink: 0; }
 .gantt-cell-nights { font-size: 0.65rem; opacity: 0.8; margin-left: 4px; }
@@ -1053,7 +1054,8 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: clip;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
