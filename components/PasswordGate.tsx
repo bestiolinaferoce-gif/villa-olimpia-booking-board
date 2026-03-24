@@ -5,7 +5,14 @@ import { useEffect, useState } from "react";
 
 const SESSION_KEY = "villa-olimpia:auth";
 
-export function PasswordGate({ children }: { children: React.ReactNode }) {
+export function PasswordGate({
+  children,
+  subtitle,
+}: {
+  children: React.ReactNode;
+  /** Es. messaggio contestuale per route dedicate (es. Preventivi). */
+  subtitle?: string;
+}) {
   const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
@@ -36,6 +43,9 @@ export function PasswordGate({ children }: { children: React.ReactNode }) {
         <div className="auth-titles">
           <h1>Villa Olimpia</h1>
           <p>Booking Board</p>
+          {subtitle ? (
+            <p className="auth-subtitle">{subtitle}</p>
+          ) : null}
         </div>
         <form
           onSubmit={(e) => {

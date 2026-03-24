@@ -1,7 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { Calendar, CloudUpload, Download, Mail, Plus, Printer, Upload } from "lucide-react";
+import Link from "next/link";
+import {
+  Calendar,
+  CloudUpload,
+  Download,
+  FileText,
+  Mail,
+  Plus,
+  Printer,
+  Upload,
+} from "lucide-react";
 import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
@@ -111,6 +121,15 @@ export function Toolbar({
             <Plus size={15} />
             Nuova prenotazione
           </button>
+          <Link
+            href="/preventivi"
+            className="ghost-btn"
+            title="Apri il modulo Preventivi"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <FileText size={15} />
+            Crea preventivo
+          </Link>
           <button type="button" className="ghost-btn" onClick={onEmailImport}>
             <Mail size={15} />
             Importa da Email
