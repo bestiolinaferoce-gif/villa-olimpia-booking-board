@@ -17,6 +17,17 @@ export type Lodge = (typeof LODGES)[number];
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export type BookingChannel = (typeof BOOKING_CHANNELS)[number];
 
+/** Origine record (audit / n8n / merge). Opzionale per retrocompatibilità. */
+export type BookingDataOrigin = "manual" | "import_json" | "import_email" | "sync" | "n8n";
+
+export const BOOKING_DATA_ORIGINS: readonly BookingDataOrigin[] = [
+  "manual",
+  "import_json",
+  "import_email",
+  "sync",
+  "n8n",
+] as const;
+
 export type GuestProfile = {
   surname?: string;
   firstName?: string;
@@ -30,6 +41,10 @@ export type GuestProfile = {
   gender?: "M" | "F" | "";
   fiscalCode?: string;
   residence?: string;
+  /** Indirizzo strutturato (opzionale, per stampa/archivio) */
+  residenceCity?: string;
+  residenceProvince?: string;
+  residencePostalCode?: string;
   documentType?: "CARTA_IDENTITA" | "PASSAPORTO" | "PATENTE" | "PERMESSO_SOGGIORNO" | "";
   documentNumber?: string;
   documentIssuePlace?: string;
@@ -49,10 +64,18 @@ export type Booking = {
   totalAmount: number;
   depositAmount: number;
   depositReceived: boolean;
+  /** Dettaglio economico opzionale (stampa / confronto archivi) */
+  extrasAmount?: number;
+  cleaningFee?: number;
+  touristTax?: number;
+  childrenCount?: number;
+  economicNotes?: string;
   createdAt: string;
   updatedAt: string;
   isNew?: boolean;
   guestProfile?: GuestProfile;
+  /** Chi ha creato/ultimo merge noto (opzionale su dati legacy) */
+  dataOrigin?: BookingDataOrigin;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;

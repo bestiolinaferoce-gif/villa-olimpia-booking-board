@@ -3,9 +3,11 @@ import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
 import {
   BOOKING_CHANNELS,
+  BOOKING_DATA_ORIGINS,
   BOOKING_STATUSES,
   type BackupSnapshot,
   type Booking,
+  type BookingDataOrigin,
   type BookingFilters,
   type BookingInput,
 } from "@/lib/types";
@@ -42,6 +44,10 @@ type BookingState = {
   showToast: (message: string, type?: "success" | "error") => void;
   clearToast: () => void;
 };
+
+function isBookingDataOrigin(v: unknown): v is BookingDataOrigin {
+  return typeof v === "string" && (BOOKING_DATA_ORIGINS as readonly string[]).includes(v);
+}
 
 /** Export Airbnb / CSV spesso hanno `source` senza `channel`, e niente `status`: senza questo l'import scarta tutto. */
 function channelAndStatusFromImport(item: Partial<Booking> & { source?: string }): {
@@ -89,6 +95,20 @@ function validateBookingPayload(payload: BookingInput): void {
   if (payload.depositReceived && payload.depositAmount <= 0) {
     throw new Error("Caparra ricevuta richiede un importo caparra maggiore di zero.");
   }
+  const optNonNeg = (v: number | undefined, label: string) => {
+    if (v === undefined) return;
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+      throw new Error(`${label} non valido.`);
+    }
+  };
+  optNonNeg(payload.extrasAmount, "Extra");
+  optNonNeg(payload.cleaningFee, "Pulizie");
+  optNonNeg(payload.touristTax, "Tassa soggiorno");
+  if (payload.childrenCount !== undefined) {
+    if (!Number.isInteger(payload.childrenCount) || payload.childrenCount < 0) {
+      throw new Error("Numero bambini non valido.");
+    }
+  }
 }
 
 function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?: string): void {
@@ -119,15 +139,69 @@ function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Bookin
   })) as Booking[];
 }
 
-function persistSettings(settings: { monthTheme: boolean }): void {
+function bookingUpdatedMs(b: Booking): number {
+  const t = Date.parse(b.updatedAt);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano (POST non ancora su KV). */
+function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[] {
+  const map = new Map<string, Booking>();
+  for (const b of serverRows) {
+    map.set(b.id, b);
+  }
+  for (const b of localRows) {
+    const s = map.get(b.id);
+    if (!s) {
+      map.set(b.id, b);
+      continue;
+    }
+    if (bookingUpdatedMs(b) > bookingUpdatedMs(s)) {
+      map.set(b.id, b);
+    }
+  }
+  return Array.from(map.values()).sort((a, c) => a.checkIn.localeCompare(c.checkIn));
+}
+
+function mergeEnrichedLocal(merged: Booking[], serverRows: Booking[]): boolean {
+  if (merged.length !== serverRows.length) return true;
+  const byId = new Map(serverRows.map((b) => [b.id, b]));
+  for (const m of merged) {
+    const s = byId.get(m.id);
+    if (!s) return true;
+    if (bookingUpdatedMs(m) > bookingUpdatedMs(s)) return true;
+  }
+  return false;
+}
+
+function persistSettings(patch: Partial<{ monthTheme: boolean; serverVersion: number }>): void {
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  let base: { monthTheme?: boolean; serverVersion?: number } = {};
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (raw) base = JSON.parse(raw) as typeof base;
+  } catch {
+    /* ignore */
+  }
+  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...base, ...patch }));
 }
 
 export const useBookingStore = create<BookingState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function pushBackupSnapshot(bookings: Booking[]): void {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(BACKUP_KEY);
+      const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
+      const merged = [{ createdAt: new Date().toISOString(), bookings: [...bookings] }, ...current].slice(0, 10);
+      window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+    } catch {
+      /* ignore */
+    }
+  }
 
   function persist(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
@@ -144,7 +218,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
           .then(async (r) => {
             if (r.ok) {
               const res = (await r.json()) as { ok: boolean; v?: number };
-              if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+              if (typeof res.v === "number") {
+                set({ serverVersion: res.v, syncError: false });
+                persistSettings({ serverVersion: res.v });
+              }
             }
           })
           .catch(() => set({ syncError: true }));
@@ -177,8 +254,9 @@ export const useBookingStore = create<BookingState>((set, get) => {
     const rawSettings = window.localStorage.getItem(SETTINGS_KEY);
     if (rawSettings) {
       try {
-        const s = JSON.parse(rawSettings) as { monthTheme?: boolean };
+        const s = JSON.parse(rawSettings) as { monthTheme?: boolean; serverVersion?: number };
         if (typeof s.monthTheme === "boolean") set({ monthTheme: s.monthTheme });
+        if (typeof s.serverVersion === "number") set({ serverVersion: s.serverVersion });
       } catch { /* ignore */ }
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -194,9 +272,23 @@ export const useBookingStore = create<BookingState>((set, get) => {
         if (!payload) return;
         const data = Array.isArray(payload) ? payload : (payload.data ?? []);
         if (data.length > 0) {
+          const incomingV =
+            typeof payload === "object" && payload !== null && !Array.isArray(payload)
+              ? ((payload as { v?: number }).v ?? 0)
+              : 0;
+          if (incomingV < get().serverVersion) {
+            return;
+          }
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
-          set({ bookings: migrated, serverVersion: payload.v ?? 0, syncError: false });
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          const localRows = get().bookings;
+          const combined = mergeKvWithLocal(migrated, localRows);
+          const nextVersion = (payload as { v?: number }).v ?? 0;
+          set({ bookings: combined, serverVersion: nextVersion, syncError: false });
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+          persistSettings({ serverVersion: nextVersion });
+          if (mergeEnrichedLocal(combined, migrated)) {
+            persist(combined);
+          }
         } else {
           const cur = get().bookings;
           if (cur.length > 0) {
@@ -224,12 +316,21 @@ export const useBookingStore = create<BookingState>((set, get) => {
           const full = await fetch("/api/bookings", { cache: "no-store" });
           if (!full.ok) throw new Error("full fetch failed");
           const payload = (await full.json()) as { v?: number; data?: Booking[] } | Booking[];
+          const newV = Array.isArray(payload) ? v : (payload.v ?? v);
+          if (newV < get().serverVersion) {
+            return;
+          }
           const data = Array.isArray(payload) ? payload : (payload.data ?? []);
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
-          const newV = Array.isArray(payload) ? 0 : (payload.v ?? v);
-          set({ bookings: migrated, serverVersion: newV, syncError: false, hasNewBookings: true });
+          const localRows = get().bookings;
+          const combined = mergeKvWithLocal(migrated, localRows);
+          set({ bookings: combined, serverVersion: newV, syncError: false, hasNewBookings: true });
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+            persistSettings({ serverVersion: newV });
+          }
+          if (mergeEnrichedLocal(combined, migrated)) {
+            persist(combined);
           }
         }
       } catch { /* silent — non aggiornare syncError da polling */ }
@@ -273,7 +374,9 @@ export const useBookingStore = create<BookingState>((set, get) => {
       isNew: true,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
+      economicNotes: payload.economicNotes?.trim() || undefined,
       guestsCount: payload.guestsCount,
+      dataOrigin: isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : "manual",
       createdAt: now,
       updatedAt: now,
     };
@@ -296,8 +399,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
       isNew: payload.isNew ?? false,
       guestName: payload.guestName.trim(),
       notes: payload.notes.trim(),
+      economicNotes: payload.economicNotes?.trim() || undefined,
       updatedAt: new Date().toISOString(),
       guestProfile: payload.guestProfile ?? current.guestProfile,
+      dataOrigin: isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : current.dataOrigin,
     };
     const next = bookings.map((booking) => (booking.id === id ? updated : booking)).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
@@ -310,11 +415,20 @@ export const useBookingStore = create<BookingState>((set, get) => {
     persist(next);
   },
   importBookingsMerge: (incoming) => {
+    pushBackupSnapshot(get().bookings);
+
     const normalized = incoming
       .filter((item) => item && item.id && item.guestName)
       .map((item) => {
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
         const { channel, status } = channelAndStatusFromImport(item);
+        const updatedAt =
+          typeof item.updatedAt === "string" && item.updatedAt.trim()
+            ? item.updatedAt.trim()
+            : new Date().toISOString();
+        const dataOrigin: BookingDataOrigin = isBookingDataOrigin(item.dataOrigin)
+          ? item.dataOrigin
+          : "import_json";
         return {
           ...item,
           channel,
@@ -328,7 +442,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
           depositAmount: Number(item.depositAmount ?? 0),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          updatedAt,
+          dataOrigin,
         };
       }) as Booking[];
 
@@ -340,6 +455,14 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
     normalized.forEach((candidate) => {
       try {
+        const existing = map.get(candidate.id);
+        if (
+          existing?.dataOrigin === "manual" &&
+          bookingUpdatedMs(candidate) <= bookingUpdatedMs(existing)
+        ) {
+          skipped += 1;
+          return;
+        }
         const guestsCount = typeof candidate.guestsCount === "number" && candidate.guestsCount >= 1 ? candidate.guestsCount : 2;
         const payload: BookingInput = {
           guestName: candidate.guestName,
@@ -353,6 +476,13 @@ export const useBookingStore = create<BookingState>((set, get) => {
           totalAmount: candidate.totalAmount,
           depositAmount: candidate.depositAmount,
           depositReceived: candidate.depositReceived,
+          guestProfile: candidate.guestProfile,
+          extrasAmount: candidate.extrasAmount,
+          cleaningFee: candidate.cleaningFee,
+          touristTax: candidate.touristTax,
+          childrenCount: candidate.childrenCount,
+          economicNotes: candidate.economicNotes,
+          dataOrigin: candidate.dataOrigin,
         };
         validateBookingPayload(payload);
         ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
@@ -384,7 +514,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
       });
       if (r.ok) {
         const res = (await r.json()) as { ok: boolean; v?: number };
-        if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+        if (typeof res.v === "number") {
+          set({ serverVersion: res.v, syncError: false });
+          persistSettings({ serverVersion: res.v });
+        }
         get().showToast(`✓ ${cur.length} prenotazioni caricate sul cloud (v${res.v ?? "?"}).`);
       } else {
         get().showToast("Errore durante il caricamento sul cloud.", "error");
@@ -395,14 +528,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
     }
   },
   syncLocalToCloud: async () => {
-    let local: Booking[] = [];
-    try {
-      const raw =
-        typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-      if (raw) local = JSON.parse(raw) as Booking[];
-    } catch {
-      local = [];
-    }
+    pushBackupSnapshot(get().bookings);
+    const local = get().bookings;
 
     if (local.length === 0) {
       get().showToast("Nessuna prenotazione locale da sincronizzare.", "error");

@@ -49,6 +49,7 @@ type ToolbarProps = {
   onClearNotification?: () => void;
   newBookingsCount?: number;
   onLogout?: () => void;
+  onOpenPrintOptions?: () => void;
   // summary bar
   visibleCount: number;
   visibleTotal: number;
@@ -84,6 +85,7 @@ export function Toolbar({
   visibleDeposits,
   newBookingsCount = 0,
   onLogout,
+  onOpenPrintOptions,
 }: ToolbarProps) {
   return (
     <section className="toolbar no-print">
@@ -98,7 +100,15 @@ export function Toolbar({
           />
           <h1>Villa Olimpia — Booking Board</h1>
         </div>
-        <span>{format(monthDate, "MMMM yyyy")}</span>
+        <div className="title-row-right">
+          <span className="month-pill">{format(monthDate, "MMMM yyyy")}</span>
+          {onLogout ? (
+            <button type="button" className="logout-btn" onClick={onLogout} title="Esci dalla sessione">
+              <LogOut size={15} />
+              Logout
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="controls-row">
@@ -119,7 +129,7 @@ export function Toolbar({
           onShowCancelled={onShowCancelled}
           onMonthTheme={onMonthTheme}
         />
-        <div className="group">
+        <div className="group toolbar-actions">
           <button type="button" className="ghost-btn" onClick={onNewBooking}>
             <Plus size={15} />
             Nuova prenotazione
@@ -192,16 +202,14 @@ export function Toolbar({
               ⚠ Offline
             </span>
           )}
-          <button type="button" className="ghost-btn" onClick={() => window.print()}>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => (onOpenPrintOptions ? onOpenPrintOptions() : window.print())}
+          >
             <Printer size={15} />
             Stampa
           </button>
-          {onLogout ? (
-            <button type="button" className="ghost-btn" onClick={onLogout} title="Esci dalla sessione">
-              <LogOut size={15} />
-              Logout
-            </button>
-          ) : null}
         </div>
       </div>
 

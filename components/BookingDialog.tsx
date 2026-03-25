@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { differenceInDays, parseISO } from "date-fns";
+import { addDays, differenceInDays, format, parseISO } from "date-fns";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -23,11 +23,12 @@ type FormState = BookingInput;
 
 function buildDefault(lodge?: Lodge, day?: string): FormState {
   const checkIn = day || new Date().toISOString().slice(0, 10);
+  const checkInDate = parseISO(checkIn);
   return {
     guestName: "",
     lodge: lodge || LODGES[0],
     checkIn,
-    checkOut: new Date(new Date(checkIn).setDate(new Date(checkIn).getDate() + 1)).toISOString().slice(0, 10),
+    checkOut: format(addDays(checkInDate, 1), "yyyy-MM-dd"),
     status: "confirmed",
     channel: "direct",
     notes: "",
@@ -84,6 +85,12 @@ export function BookingDialog({
         depositAmount: booking.depositAmount,
         depositReceived: booking.depositReceived,
         guestProfile: booking.guestProfile,
+        extrasAmount: booking.extrasAmount,
+        cleaningFee: booking.cleaningFee,
+        touristTax: booking.touristTax,
+        childrenCount: booking.childrenCount,
+        economicNotes: booking.economicNotes,
+        dataOrigin: booking.dataOrigin,
       });
       setError("");
       setFieldErrors({});
@@ -101,6 +108,7 @@ export function BookingDialog({
           guestsCount: (initialPrefill.guestsCount && initialPrefill.guestsCount >= 1) ? initialPrefill.guestsCount : base.guestsCount,
           totalAmount: initialPrefill.totalAmount ?? base.totalAmount,
           depositAmount: initialPrefill.depositAmount ?? (initialPrefill.totalAmount && initialPrefill.totalAmount > 0 ? Math.round(initialPrefill.totalAmount * 0.3 * 100) / 100 : base.depositAmount),
+          dataOrigin: initialPrefill.dataOrigin,
         }
       : base;
     setForm(merged);
@@ -165,6 +173,10 @@ export function BookingDialog({
     if (message.includes("Check-in") && message.includes("check-out")) return "checkIn";
     if (message.includes("numero ospiti")) return "guestsCount";
     if (message.includes("caparra non può superare") || message.includes("Caparra ricevuta")) return "depositAmount";
+    if (message.includes("Extra")) return "extrasAmount";
+    if (message.includes("Pulizie")) return "cleaningFee";
+    if (message.includes("Tassa soggiorno")) return "touristTax";
+    if (message.includes("bambini")) return "childrenCount";
     return null;
   }
 
@@ -277,7 +289,26 @@ export function BookingDialog({
                 </label>
                 <label>
                   Residuo da incassare
-                  <input readOnly value={`€ ${Math.max(0, form.totalAmount - form.depositAmount).toFixed(2)}`} style={{ background: "var(--bg)", color: "var(--muted)", cursor: "default" }} />
+                  <input readOnly value={`€ ${Math.max(0, form.totalAmount - (form.depositReceived ? form.depositAmount : 0)).toFixed(2)}`} style={{ background: "var(--bg)", color: "var(--muted)", cursor: "default" }} />
+                </label>
+                <label>Extra (importo)
+                  <input type="number" min={0} step="0.01" value={form.extrasAmount ?? ""} placeholder="—" onChange={(e) => change("extrasAmount", e.target.value === "" ? undefined : Number(e.target.value))} />
+                  {fieldErrors.extrasAmount && <span className="field-error">{fieldErrors.extrasAmount}</span>}
+                </label>
+                <label>Pulizie / servizi
+                  <input type="number" min={0} step="0.01" value={form.cleaningFee ?? ""} placeholder="—" onChange={(e) => change("cleaningFee", e.target.value === "" ? undefined : Number(e.target.value))} />
+                  {fieldErrors.cleaningFee && <span className="field-error">{fieldErrors.cleaningFee}</span>}
+                </label>
+                <label>Tassa di soggiorno
+                  <input type="number" min={0} step="0.01" value={form.touristTax ?? ""} placeholder="—" onChange={(e) => change("touristTax", e.target.value === "" ? undefined : Number(e.target.value))} />
+                  {fieldErrors.touristTax && <span className="field-error">{fieldErrors.touristTax}</span>}
+                </label>
+                <label>Bambini (n.)
+                  <input type="number" min={0} value={form.childrenCount ?? ""} placeholder="—" onChange={(e) => change("childrenCount", e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value || "0", 10)))} />
+                  {fieldErrors.childrenCount && <span className="field-error">{fieldErrors.childrenCount}</span>}
+                </label>
+                <label className="full-width">Note economiche
+                  <input value={form.economicNotes ?? ""} placeholder="Es. sconto accordato, extra in contanti…" onChange={(e) => change("economicNotes", e.target.value || undefined)} />
                 </label>
               </div>
             </div>
@@ -307,7 +338,10 @@ export function BookingDialog({
                   <label>Stato di nascita <input placeholder="Italia" value={form.guestProfile?.birthCountry ?? ""} onChange={(e) => changeProfile("birthCountry", e.target.value)} /></label>
                   <label>Cittadinanza <input placeholder="Italiana" value={form.guestProfile?.nationality ?? ""} onChange={(e) => changeProfile("nationality", e.target.value)} /></label>
                   <label>Codice Fiscale <input maxLength={16} placeholder="RSSMRA80A01H501Z" value={form.guestProfile?.fiscalCode ?? ""} onChange={(e) => changeProfile("fiscalCode", e.target.value.toUpperCase())} style={{ fontFamily: "monospace", letterSpacing: "0.08em" }} /></label>
-                  <label className="full-width">Residenza (via, n°, città, CAP) <input placeholder="Via Roma 1, 20100 Milano" value={form.guestProfile?.residence ?? ""} onChange={(e) => changeProfile("residence", e.target.value)} /></label>
+                  <label className="full-width">Residenza (indirizzo) <input placeholder="Via e numero civico" value={form.guestProfile?.residence ?? ""} onChange={(e) => changeProfile("residence", e.target.value)} /></label>
+                  <label>Città <input placeholder="Milano" value={form.guestProfile?.residenceCity ?? ""} onChange={(e) => changeProfile("residenceCity", e.target.value)} /></label>
+                  <label>Provincia (sigla) <input maxLength={3} placeholder="MI" value={form.guestProfile?.residenceProvince ?? ""} onChange={(e) => changeProfile("residenceProvince", e.target.value.toUpperCase())} /></label>
+                  <label>CAP <input maxLength={10} placeholder="20100" value={form.guestProfile?.residencePostalCode ?? ""} onChange={(e) => changeProfile("residencePostalCode", e.target.value)} /></label>
                   <label>Email <input type="email" autoComplete="email" placeholder="ospite@email.it" value={form.guestProfile?.email ?? ""} onChange={(e) => changeProfile("email", e.target.value)} /></label>
                   <label>Telefono <input type="tel" autoComplete="tel" placeholder="+39 …" value={form.guestProfile?.phone ?? ""} onChange={(e) => changeProfile("phone", e.target.value)} /></label>
                   <label>Tipo documento

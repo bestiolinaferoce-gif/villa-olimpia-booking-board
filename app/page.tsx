@@ -3,6 +3,7 @@
 import { addDays, endOfMonth, format, getMonth, getYear, isBefore, parseISO, startOfMonth } from "date-fns";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { GanttBoard } from "@/components/GanttBoard";
 import { BookingDialog } from "@/components/BookingDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -17,6 +18,8 @@ import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
 import { BoardPrintDocument } from "@/components/BoardPrintDocument";
+import { PrintOptionsDialog } from "@/components/PrintOptionsDialog";
+import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
@@ -68,6 +71,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<{ incoming: Booking[] } | null>(null);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
+  const [printSections, setPrintSections] = useState<PrintSections>(PRINT_SECTIONS_FULL);
+  const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -116,7 +121,7 @@ export default function Home() {
 
   function openNewBookingFromPrefill(prefillData: Partial<BookingInput> & { lodge?: Lodge }) {
     setEditing(null);
-    setPrefill(prefillData);
+    setPrefill({ ...prefillData, dataOrigin: "import_email" });
     setDialogOpen(true);
   }
 
@@ -281,6 +286,14 @@ export default function Home() {
     window.location.assign("/");
   }
 
+  function handlePrintConfirm(nextSections: PrintSections) {
+    flushSync(() => {
+      setPrintSections(nextSections);
+      setPrintOptionsOpen(false);
+    });
+    window.print();
+  }
+
   return (
     <PasswordGate>
     <MigrationHelper />
@@ -314,12 +327,21 @@ export default function Home() {
         visibleDeposits={visibleSummary.deposits}
         newBookingsCount={newBookingsCount}
         onLogout={handleLogout}
+        onOpenPrintOptions={() => setPrintOptionsOpen(true)}
+      />
+
+      <PrintOptionsDialog
+        open={printOptionsOpen}
+        onClose={() => setPrintOptionsOpen(false)}
+        initialSections={printSections}
+        onConfirmPrint={handlePrintConfirm}
       />
 
       <BoardPrintDocument
         bookings={printBookings}
         monthLabel={format(monthDate, "MMMM yyyy")}
         generatedAtLabel={generatedAtLabel}
+        sections={printSections}
       />
 
       <section className="print-title no-print">
