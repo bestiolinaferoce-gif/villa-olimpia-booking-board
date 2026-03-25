@@ -16,8 +16,10 @@ import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types
 import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
+import { BoardPrintDocument } from "@/components/BoardPrintDocument";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { MigrationHelper } from "@/components/MigrationHelper";
+import { clearAuthSession } from "@/lib/authSession";
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -264,6 +266,21 @@ export default function Home() {
     return [year - 2, year - 1, year, year + 1, year + 2];
   }, [monthDate]);
 
+  const printBookings = useMemo(
+    () =>
+      [...bookings]
+        .filter((b) => matchesFilters(b, filters))
+        .sort((a, c) => a.checkIn.localeCompare(c.checkIn)),
+    [bookings, filters]
+  );
+
+  const generatedAtLabel = format(new Date(), "dd/MM/yyyy HH:mm");
+
+  function handleLogout() {
+    clearAuthSession();
+    window.location.assign("/");
+  }
+
   return (
     <PasswordGate>
     <MigrationHelper />
@@ -296,9 +313,16 @@ export default function Home() {
         visibleTotal={visibleSummary.total}
         visibleDeposits={visibleSummary.deposits}
         newBookingsCount={newBookingsCount}
+        onLogout={handleLogout}
       />
 
-      <section className="print-title">
+      <BoardPrintDocument
+        bookings={printBookings}
+        monthLabel={format(monthDate, "MMMM yyyy")}
+        generatedAtLabel={generatedAtLabel}
+      />
+
+      <section className="print-title no-print">
         <Image src="/logo-villa-olimpia.png" alt="" width={36} height={36} className="print-logo" />
         <div>
           <h2>Villa Olimpia — Booking Board</h2>

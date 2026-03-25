@@ -32,7 +32,7 @@ export function Toast() {
         .toast-anim { animation: toast-slide-in 0.25s ease; }
       `}</style>
       <div
-        className="toast-anim"
+        className="toast-anim no-print"
         role="alert"
         aria-live="polite"
         style={{

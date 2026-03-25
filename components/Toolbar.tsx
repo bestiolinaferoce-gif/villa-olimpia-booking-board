@@ -7,6 +7,7 @@ import {
   CloudUpload,
   Download,
   FileText,
+  LogOut,
   Mail,
   Plus,
   Printer,
@@ -47,6 +48,7 @@ type ToolbarProps = {
   hasNewBookings?: boolean;
   onClearNotification?: () => void;
   newBookingsCount?: number;
+  onLogout?: () => void;
   // summary bar
   visibleCount: number;
   visibleTotal: number;
@@ -81,6 +83,7 @@ export function Toolbar({
   visibleTotal,
   visibleDeposits,
   newBookingsCount = 0,
+  onLogout,
 }: ToolbarProps) {
   return (
     <section className="toolbar no-print">
@@ -193,6 +196,12 @@ export function Toolbar({
             <Printer size={15} />
             Stampa
           </button>
+          {onLogout ? (
+            <button type="button" className="ghost-btn" onClick={onLogout} title="Esci dalla sessione">
+              <LogOut size={15} />
+              Logout
+            </button>
+          ) : null}
         </div>
       </div>
 

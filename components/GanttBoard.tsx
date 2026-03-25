@@ -195,7 +195,7 @@ export function GanttBoard({
   const gridCols = `180px repeat(${daysCount}, minmax(32px, 1fr))`;
 
   return (
-    <div className="gantt-wrap" style={{ overflowX: "auto" }}>
+    <div className="gantt-wrap no-print" style={{ overflowX: "auto" }}>
       <div
         className="gantt-header"
         style={{

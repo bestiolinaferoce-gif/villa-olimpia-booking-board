@@ -72,7 +72,7 @@ type Props = { data: KPIData; monthLabel: string };
 
 export function KPIPanel({ data, monthLabel }: Props) {
   return (
-    <div className="kpi-panel" role="region" aria-label={`KPI ${monthLabel}`}>
+    <div className="kpi-panel no-print" role="region" aria-label={`KPI ${monthLabel}`}>
       {CARDS.map((card) => {
         const Icon = card.icon;
         const iconColor = resolve(card.iconColor, data);

@@ -1165,3 +1165,86 @@ body {
   align-items: center;
   gap: 4px;
 }
+
+/* Scheda stampabile (schermo: nascosta; stampa: solo questo + nessun .no-print) */
+.board-print-document {
+  display: none;
+}
+
+@media print {
+  .board-print-document {
+    display: block !important;
+    width: 100%;
+    color: #000;
+    background: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+
+  .board-print-meta {
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #000;
+    font-size: 9pt;
+  }
+
+  .board-print-meta p {
+    margin: 0 0 4px;
+  }
+
+  .board-print-header {
+    margin-bottom: 16px;
+  }
+
+  .board-print-header h1 {
+    margin: 0 0 4px;
+    font-size: 14pt;
+    font-weight: 700;
+  }
+
+  .board-print-sub {
+    margin: 0;
+    font-size: 10pt;
+    color: #333;
+  }
+
+  .board-print-block {
+    margin-bottom: 14px;
+  }
+
+  .board-print-block h2 {
+    margin: 0 0 8px;
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #000;
+    padding-bottom: 4px;
+  }
+
+  .board-print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .board-print-table th,
+  .board-print-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 5px 8px 5px 0;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .board-print-table th {
+    width: 38%;
+    font-weight: 600;
+    color: #111;
+  }
+
+  .board-print-notes {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 10pt;
+  }
+}

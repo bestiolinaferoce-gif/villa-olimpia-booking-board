@@ -20,6 +20,8 @@ export type BookingChannel = (typeof BOOKING_CHANNELS)[number];
 export type GuestProfile = {
   surname?: string;
   firstName?: string;
+  email?: string;
+  phone?: string;
   birthDate?: string;
   birthPlace?: string;
   birthProvince?: string;

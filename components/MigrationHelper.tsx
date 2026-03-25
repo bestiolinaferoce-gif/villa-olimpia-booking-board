@@ -56,6 +56,7 @@ export function MigrationHelper() {
 
   return (
     <div
+      className="no-print"
       role="status"
       style={{
         position: "fixed",

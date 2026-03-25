@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-
-const SESSION_KEY = "villa-olimpia:auth";
+import { AUTH_SESSION_KEY } from "@/lib/authSession";
 
 export function PasswordGate({
   children,
@@ -16,7 +15,7 @@ export function PasswordGate({
   const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem(SESSION_KEY) === "1") {
+    if (typeof window !== "undefined" && sessionStorage.getItem(AUTH_SESSION_KEY) === "1") {
       setUnlocked(true);
     }
   }, []);
@@ -28,7 +27,7 @@ export function PasswordGate({
   function submit() {
     const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "caccapanna73";
     if (value === password) {
-      sessionStorage.setItem(SESSION_KEY, "1");
+      sessionStorage.setItem(AUTH_SESSION_KEY, "1");
       setUnlocked(true);
     } else {
       setError(true);

@@ -308,6 +308,8 @@ export function BookingDialog({
                   <label>Cittadinanza <input placeholder="Italiana" value={form.guestProfile?.nationality ?? ""} onChange={(e) => changeProfile("nationality", e.target.value)} /></label>
                   <label>Codice Fiscale <input maxLength={16} placeholder="RSSMRA80A01H501Z" value={form.guestProfile?.fiscalCode ?? ""} onChange={(e) => changeProfile("fiscalCode", e.target.value.toUpperCase())} style={{ fontFamily: "monospace", letterSpacing: "0.08em" }} /></label>
                   <label className="full-width">Residenza (via, n°, città, CAP) <input placeholder="Via Roma 1, 20100 Milano" value={form.guestProfile?.residence ?? ""} onChange={(e) => changeProfile("residence", e.target.value)} /></label>
+                  <label>Email <input type="email" autoComplete="email" placeholder="ospite@email.it" value={form.guestProfile?.email ?? ""} onChange={(e) => changeProfile("email", e.target.value)} /></label>
+                  <label>Telefono <input type="tel" autoComplete="tel" placeholder="+39 …" value={form.guestProfile?.phone ?? ""} onChange={(e) => changeProfile("phone", e.target.value)} /></label>
                   <label>Tipo documento
                     <select value={form.guestProfile?.documentType ?? ""} onChange={(e) => changeProfile("documentType", e.target.value as GuestProfile["documentType"])}>
                       <option value="">— Seleziona —</option>
