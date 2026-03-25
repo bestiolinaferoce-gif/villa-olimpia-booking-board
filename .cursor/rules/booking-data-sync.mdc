@@ -1,0 +1,33 @@
+---
+description: Regole obbligatorie per dati prenotazioni Villa Olimpia (KV, JSON, script) — evitare perdite e overwrite accidentali
+alwaysApply: true
+---
+
+# Dati prenotazioni (Booking Board)
+
+## Fonte di verità operativa
+
+- Il proprietario può depositare un JSON **affidabile** in `data/bookings-canonical.json` (o passare un path esplicito allo script).
+- Correzioni puntuali: il proprietario le indica; si applicano **solo** a quel record o a un diff chiaro, senza refactor del resto dell’app.
+
+## Vietato senza istruzione esplicita dell’utente
+
+- **Non** chiamare `POST /api/bookings` (sostituzione **intera** del dataset sul KV) né script equivalenti, salvo che l’utente chieda esplicitamente di **sostituire tutto** il cloud e accetti la perdita di ciò che non è nel file.
+- **Non** suggerire “push veloce” del JSON se il file è **parziale** rispetto a quanto già sul cloud.
+
+## Comportamento sicuro (default)
+
+- Per caricare da file verso il cloud usare **`npm run data:merge`** (merge-only: aggiunge solo `id` non presenti; **non** rimuove né aggiorna prenotazioni esistenti).
+- L’UI **Import JSON** usa merge per `id` nel client; stesso spirito: non è un replace globale del KV da solo (il persist invia lo stato locale).
+
+## Sostituzione completa (solo se richiesto)
+
+- Solo con comando:  
+  `VILLA_OLIMPIA_CONFIRM_REPLACE_ALL=yes npm run data:replace`  
+  (o script con `--replace-all` + stessa variabile).
+- Prima verificare che il JSON contenga **tutte** le prenotazioni desiderate, non un estratto.
+
+## Accuratezza
+
+- Allineare campi export esterni (es. `source` / `grossEarnings`) alla forma `Booking` in `lib/types.ts` prima di merge/replace; la logica in `lib/store.ts` (`importBookingsMerge`) già mappa `source` → `channel` e default `status`.
+- Non introdurre librerie o refactor estesi per i dati: modifiche **minime** e verificabili (`npm run build`).

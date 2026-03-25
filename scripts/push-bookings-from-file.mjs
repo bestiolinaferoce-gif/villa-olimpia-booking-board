@@ -1,21 +1,47 @@
 #!/usr/bin/env node
 /**
- * Carica prenotazioni sul KV via POST /api/bookings (sostituisce l'intero dataset).
- * Uso: node scripts/push-bookings-from-file.mjs [baseUrl] [pathJson]
- * Esempi:
- *   node scripts/push-bookings-from-file.mjs http://localhost:3000 data/bookings.json
- *   node scripts/push-bookings-from-file.mjs https://tuo-progetto.vercel.app
+ * Sincronizza prenotazioni verso il KV.
+ *
+ * MODALITÀ DEFAULT (sicura): POST /api/bookings/merge-local
+ *   Aggiunge solo id non già presenti sul cloud. Non rimuove e non aggiorna righe esistenti.
+ *
+ * MODALITÀ --replace-all (distruttiva): POST /api/bookings
+ *   Sostituisce l’intero dataset. Obbligatorio: VILLA_OLIMPIA_CONFIRM_REPLACE_ALL=yes
+ *
+ * Uso:
+ *   node scripts/push-bookings-from-file.mjs [baseUrl] [pathJson]
+ *   node scripts/push-bookings-from-file.mjs --replace-all [baseUrl] [pathJson]
+ *
+ * File: se omesso, usa data/bookings-canonical.json se esiste, altrimenti data/bookings.json
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const root = resolve(__dirname, "..");
 
-const baseUrl = (process.argv[2] || "http://localhost:3000").replace(/\/$/, "");
-const jsonPath = resolve(root, process.argv[3] || "data/bookings.json");
+const argv = process.argv.slice(2);
+const replaceAll = argv.includes("--replace-all");
+const positional = argv.filter((a) => !a.startsWith("--"));
+
+const baseUrl = (positional[0] || "http://localhost:3000").replace(/\/$/, "");
+
+let jsonPath = positional[1] ? resolve(root, positional[1]) : null;
+if (!jsonPath) {
+  const canon = resolve(root, "data/bookings-canonical.json");
+  const legacy = resolve(root, "data/bookings.json");
+  if (existsSync(canon)) jsonPath = canon;
+  else if (existsSync(legacy)) jsonPath = legacy;
+  else {
+    console.error(
+      "Nessun file trovato. Crea data/bookings-canonical.json (fonte affidabile) oppure passa il path.\n" +
+        `  Provati: ${canon}\n  ${legacy}`
+    );
+    process.exit(1);
+  }
+}
 
 const raw = JSON.parse(readFileSync(jsonPath, "utf8"));
 const rows = Array.isArray(raw) ? raw : raw.bookings;
@@ -59,26 +85,47 @@ const bookings = rows.map((r) => {
   };
 });
 
-const url = `${baseUrl}/api/bookings`;
-console.log(`POST ${url} — ${bookings.length} prenotazioni da ${jsonPath}`);
-
-const res = await fetch(url, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ bookings }),
-});
-
-const text = await res.text();
-let body;
-try {
-  body = JSON.parse(text);
-} catch {
-  body = text;
+if (replaceAll) {
+  const ok = String(process.env.VILLA_OLIMPIA_CONFIRM_REPLACE_ALL ?? "").toLowerCase() === "yes";
+  if (!ok) {
+    console.error(
+      "Sostituzione completa rifiutata: imposta esattamente\n" +
+        "  VILLA_OLIMPIA_CONFIRM_REPLACE_ALL=yes\n" +
+        "Questo evita di cancellare per errore prenotazioni sul cloud."
+    );
+    process.exit(1);
+  }
+  const url = `${baseUrl}/api/bookings`;
+  console.warn(`[REPLACE-ALL] POST ${url} — ${bookings.length} prenotazioni (sovrascrive TUTTO il KV)`);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bookings }),
+  });
+  await printResult(res);
+} else {
+  const url = `${baseUrl}/api/bookings/merge-local`;
+  console.log(`[MERGE] POST ${url} — ${bookings.length} prenotazioni da ${jsonPath}`);
+  console.log("  (solo id nuovi vengono aggiunti; nulla viene rimosso dal cloud)");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bookings }),
+  });
+  await printResult(res);
 }
 
-if (!res.ok) {
-  console.error("Errore HTTP", res.status, body);
-  process.exit(1);
+async function printResult(res) {
+  const text = await res.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = text;
+  }
+  if (!res.ok) {
+    console.error("Errore HTTP", res.status, body);
+    process.exit(1);
+  }
+  console.log("OK:", body);
 }
-
-console.log("OK:", body);

@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "data:merge": "node scripts/push-bookings-from-file.mjs",
+    "data:replace": "node scripts/push-bookings-from-file.mjs --replace-all",
     "data:push": "node scripts/push-bookings-from-file.mjs"
   },
   "engines": {
