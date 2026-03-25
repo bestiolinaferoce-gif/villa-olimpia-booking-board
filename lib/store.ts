@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
-import type { BackupSnapshot, Booking, BookingFilters, BookingInput } from "@/lib/types";
+import {
+  BOOKING_CHANNELS,
+  BOOKING_STATUSES,
+  type BackupSnapshot,
+  type Booking,
+  type BookingFilters,
+  type BookingInput,
+} from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 
 type BookingState = {
@@ -35,6 +42,28 @@ type BookingState = {
   showToast: (message: string, type?: "success" | "error") => void;
   clearToast: () => void;
 };
+
+/** Export Airbnb / CSV spesso hanno `source` senza `channel`, e niente `status`: senza questo l'import scarta tutto. */
+function channelAndStatusFromImport(item: Partial<Booking> & { source?: string }): {
+  channel: Booking["channel"];
+  status: Booking["status"];
+} {
+  let channel: Booking["channel"] = "direct";
+  if (item.channel && (BOOKING_CHANNELS as readonly string[]).includes(item.channel)) {
+    channel = item.channel;
+  } else {
+    const s = String(item.source ?? "").toLowerCase();
+    if (s.includes("airbnb")) channel = "airbnb";
+    else if (s.includes("booking")) channel = "booking";
+    else if (s.includes("expedia")) channel = "expedia";
+    else if (s.includes("other")) channel = "other";
+  }
+  let status: Booking["status"] = "confirmed";
+  if (item.status && (BOOKING_STATUSES as readonly string[]).includes(item.status)) {
+    status = item.status;
+  }
+  return { channel, status };
+}
 
 function validateBookingPayload(payload: BookingInput): void {
   if (!payload.guestName.trim()) {
@@ -285,12 +314,17 @@ export const useBookingStore = create<BookingState>((set, get) => {
       .filter((item) => item && item.id && item.guestName)
       .map((item) => {
         const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
+        const { channel, status } = channelAndStatusFromImport(item);
         return {
           ...item,
+          channel,
+          status,
           guestName: String(item.guestName),
           notes: String(item.notes ?? ""),
           guestsCount,
-          totalAmount: Number(item.totalAmount ?? 0),
+          totalAmount: Number(
+            item.totalAmount ?? (item as { grossEarnings?: number }).grossEarnings ?? 0
+          ),
           depositAmount: Number(item.depositAmount ?? 0),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
