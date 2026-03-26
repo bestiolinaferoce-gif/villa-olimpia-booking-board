@@ -144,7 +144,7 @@ function bookingUpdatedMs(b: Booking): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-/** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano (POST non ancora su KV). */
+/** KV + locale: stesso id → vince `updatedAt` più recente; i record solo locali NON rientrano quando il server è disponibile. */
 function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[] {
   const map = new Map<string, Booking>();
   for (const b of serverRows) {
@@ -152,10 +152,7 @@ function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[
   }
   for (const b of localRows) {
     const s = map.get(b.id);
-    if (!s) {
-      map.set(b.id, b);
-      continue;
-    }
+    if (!s) continue;
     if (bookingUpdatedMs(b) > bookingUpdatedMs(s)) {
       map.set(b.id, b);
     }
