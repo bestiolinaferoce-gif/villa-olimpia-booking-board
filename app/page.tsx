@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, endOfMonth, format, getMonth, getYear, isBefore, parseISO, startOfMonth } from "date-fns";
+import { addDays, differenceInDays, format, getMonth, getYear, isBefore, parseISO, startOfMonth } from "date-fns";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -23,6 +23,7 @@ import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
+import { reconcileBookings } from "@/lib/reconciliation";
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -73,6 +74,8 @@ export default function Home() {
   const [emailImportOpen, setEmailImportOpen] = useState(false);
   const [printSections, setPrintSections] = useState<PrintSections>(PRINT_SECTIONS_FULL);
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
+  const [printLimit, setPrintLimit] = useState<number | null>(null);
+  const [integrationStatus, setIntegrationStatus] = useState<{ n8nConfigured: boolean; kvConfigured: boolean } | null>(null);
 
   useEffect(() => {
     load();
@@ -82,6 +85,17 @@ export default function Home() {
     const stop = startPolling();
     return stop;
   }, [startPolling]);
+
+  useEffect(() => {
+    fetch("/api/integrations/status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((payload) => {
+        if (payload) setIntegrationStatus(payload);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -112,6 +126,8 @@ export default function Home() {
 
   const monthDate = useMemo(() => parseISO(currentMonth), [currentMonth]);
   const monthDays = useMemo(() => getMonthDays(monthDate), [monthDate]);
+  const reconciled = useMemo(() => reconcileBookings(bookings), [bookings]);
+  const canonicalBookings = reconciled.bookings;
 
   function openNewBooking(lodge?: Lodge, day?: Date) {
     setEditing(null);
@@ -174,33 +190,35 @@ export default function Home() {
   }
 
   const visibleSummary = useMemo(() => {
-    const filtered = bookings.filter((booking) => matchesFilters(booking, filters));
+    const filtered = canonicalBookings.filter((booking) => matchesFilters(booking, filters));
     return {
       count: filtered.length,
       total: filtered.reduce((acc, item) => acc + item.totalAmount, 0),
       deposits: filtered.reduce((acc, item) => acc + (item.depositReceived ? item.depositAmount : 0), 0),
     };
-  }, [bookings, filters]);
+  }, [canonicalBookings, filters]);
 
   const newBookingsCount = useMemo(
-    () => bookings.filter((b) => b.isNew).length,
-    [bookings]
+    () => canonicalBookings.filter((b) => b.isNew).length,
+    [canonicalBookings]
   );
 
   const monthKPIs = useMemo(() => {
     const monthStart = startOfMonth(monthDate);
-    const monthEnd = endOfMonth(monthDate);
     const daysInMonth = monthDays.length;
 
-    // Bookings with checkIn in the current month (non-cancelled)
-    const monthBookings = bookings.filter((b) => {
+    const monthBookings = canonicalBookings.filter((b) => {
       if (b.status === "cancelled") return false;
-      const ci = parseISO(b.checkIn);
-      return ci >= monthStart && ci <= monthEnd;
+      return isActiveOnDay(b, monthStart) || monthDays.some((day) => isActiveOnDay(b, day));
     });
 
     const bookingsCount = monthBookings.length;
-    const revenue = monthBookings.reduce((acc, b) => acc + b.totalAmount, 0);
+    const revenue = monthBookings.reduce((acc, b) => {
+      const totalNights = differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn));
+      if (totalNights <= 0) return acc;
+      const nightsInMonth = monthDays.filter((day) => isActiveOnDay(b, day)).length;
+      return acc + (b.totalAmount / totalNights) * nightsInMonth;
+    }, 0);
     const depositsReceived = monthBookings.reduce(
       (acc, b) => acc + (b.depositReceived ? b.depositAmount : 0),
       0
@@ -209,7 +227,7 @@ export default function Home() {
     // Occupancy: count occupied lodge-nights in the month
     let occupiedLodgeNights = 0;
     for (const lodge of LODGES) {
-      const lodgeBookings = bookings.filter(
+      const lodgeBookings = canonicalBookings.filter(
         (b) => b.lodge === lodge && b.status !== "cancelled"
       );
       for (const day of monthDays) {
@@ -223,14 +241,13 @@ export default function Home() {
       : 0;
 
     return { bookingsCount, revenue, depositsReceived, occupancyPct, newBookingsCount };
-  }, [bookings, monthDate, monthDays, newBookingsCount]);
+  }, [canonicalBookings, monthDate, monthDays, newBookingsCount]);
 
   const lodgeSummaries = useMemo(() => {
-    const filtered = bookings.filter((b) => matchesFilters(b, filters));
     const firstDay = monthDays[0];
     const lastDay = monthDays[monthDays.length - 1];
     const inMonth = firstDay && lastDay
-      ? filtered.filter((b) => {
+      ? canonicalBookings.filter((b) => {
           let cursor = new Date(firstDay);
           while (!isBefore(lastDay, cursor)) {
             if (isActiveOnDay(b, cursor)) return true;
@@ -240,7 +257,7 @@ export default function Home() {
         })
       : [];
     return computeLodgeSummaries(monthDate, inMonth);
-  }, [bookings, filters, monthDate, monthDays]);
+  }, [canonicalBookings, monthDate, monthDays]);
 
   useEffect(() => {
     const MONTH_ACCENTS: Record<number, string> = {
@@ -273,10 +290,10 @@ export default function Home() {
 
   const printBookings = useMemo(
     () =>
-      [...bookings]
+      [...canonicalBookings]
         .filter((b) => matchesFilters(b, filters))
         .sort((a, c) => a.checkIn.localeCompare(c.checkIn)),
-    [bookings, filters]
+    [canonicalBookings, filters]
   );
 
   const generatedAtLabel = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -286,9 +303,10 @@ export default function Home() {
     window.location.assign("/");
   }
 
-  function handlePrintConfirm(nextSections: PrintSections) {
+  function handlePrintConfirm(nextSections: PrintSections, nextLimit: number | null) {
     flushSync(() => {
       setPrintSections(nextSections);
+      setPrintLimit(nextLimit);
       setPrintOptionsOpen(false);
     });
     window.print();
@@ -320,6 +338,7 @@ export default function Home() {
         onForceSync={() => forceSyncToCloud()}
         onSyncLocal={() => syncLocalToCloud()}
         syncError={syncError}
+        integrationStatus={integrationStatus}
         hasNewBookings={hasNewBookings}
         onClearNotification={clearNewBookingsNotification}
         visibleCount={visibleSummary.count}
@@ -334,6 +353,8 @@ export default function Home() {
         open={printOptionsOpen}
         onClose={() => setPrintOptionsOpen(false)}
         initialSections={printSections}
+        initialLimit={printLimit}
+        totalBookings={printBookings.length}
         onConfirmPrint={handlePrintConfirm}
       />
 
@@ -342,6 +363,7 @@ export default function Home() {
         monthLabel={format(monthDate, "MMMM yyyy")}
         generatedAtLabel={generatedAtLabel}
         sections={printSections}
+        limit={printLimit}
       />
 
       <section className="print-title no-print">
@@ -355,10 +377,15 @@ export default function Home() {
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
 
       <ErrorBoundary>
-        <GanttBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
+        <GanttBoard monthDays={monthDays} bookings={canonicalBookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
       </ErrorBoundary>
 
-      <MonthSummary monthDate={monthDate} lodgeSummaries={lodgeSummaries} />
+      <MonthSummary
+        monthDate={monthDate}
+        lodgeSummaries={lodgeSummaries}
+        duplicatesCollapsed={reconciled.duplicatesCollapsed}
+        overlapsDetected={reconciled.overlapsDetected}
+      />
 
       <input
         ref={fileInputRef}

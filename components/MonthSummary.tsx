@@ -66,9 +66,11 @@ export function computeLodgeSummaries(
 type MonthSummaryProps = {
   monthDate: Date;
   lodgeSummaries: LodgeSummary[];
+  duplicatesCollapsed?: number;
+  overlapsDetected?: number;
 };
 
-export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
+export function MonthSummary({ monthDate, lodgeSummaries, duplicatesCollapsed = 0, overlapsDetected = 0 }: MonthSummaryProps) {
   const totalNotti = lodgeSummaries.reduce((acc, s) => acc + s.nightsBooked, 0);
   const totalRevenue = lodgeSummaries.reduce((acc, s) => acc + s.revenue, 0);
   const totalDays = differenceInDays(addDays(endOfMonth(monthDate), 1), startOfMonth(monthDate));
@@ -83,6 +85,11 @@ export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
       <h3 className="month-summary-title">
         Riepilogo {format(monthDate, "MMMM yyyy")} — {totalNotti} notti occupate / {totalDays} giorni · Occupancy media {avgOccupancy.toFixed(0)}%
       </h3>
+      {(duplicatesCollapsed > 0 || overlapsDetected > 0) && (
+        <p className="month-summary-alert">
+          Duplicati normalizzati: {duplicatesCollapsed} · Conflitti/sovrapposizioni da verificare: {overlapsDetected}
+        </p>
+      )}
       <table className="summary-table">
         <thead>
           <tr>

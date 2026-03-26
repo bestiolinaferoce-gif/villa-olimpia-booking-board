@@ -45,6 +45,7 @@ type ToolbarProps = {
   onForceSync: () => void;
   onSyncLocal?: () => void;
   syncError: boolean;
+  integrationStatus?: { n8nConfigured: boolean; kvConfigured: boolean } | null;
   hasNewBookings?: boolean;
   onClearNotification?: () => void;
   newBookingsCount?: number;
@@ -78,6 +79,7 @@ export function Toolbar({
   onForceSync,
   onSyncLocal,
   syncError,
+  integrationStatus,
   hasNewBookings = false,
   onClearNotification,
   visibleCount,
@@ -167,7 +169,7 @@ export function Toolbar({
           <button
             type="button"
             className={syncError ? "ghost-btn danger-btn" : "ghost-btn"}
-            title={syncError ? "Sync offline — clicca per ritentare il caricamento" : "Forza caricamento dati sul cloud"}
+            title={syncError ? "Sincronizzazione non riuscita — ritenta il sync bidirezionale" : "Sincronizza locale e cloud"}
             onClick={onForceSync}
           >
             <CloudUpload size={15} />
@@ -177,11 +179,23 @@ export function Toolbar({
             <button
               type="button"
               className="ghost-btn"
-              title="Sincronizza prenotazioni locali al cloud"
+              title="Ricarica e riallinea i dati dal cloud"
               onClick={onSyncLocal}
             >
-              ☁️ Sync locale
+              ☁️ Aggiorna
             </button>
+          )}
+          {integrationStatus && (
+            <span
+              className={integrationStatus.n8nConfigured && integrationStatus.kvConfigured ? "sync-ok" : "sync-error"}
+              title={
+                integrationStatus.n8nConfigured && integrationStatus.kvConfigured
+                  ? "KV e n8n configurati"
+                  : "Una o più integrazioni non sono configurate"
+              }
+            >
+              {integrationStatus.n8nConfigured && integrationStatus.kvConfigured ? "n8n ✓" : "n8n ⚠"}
+            </span>
           )}
           {hasNewBookings && (
             <button

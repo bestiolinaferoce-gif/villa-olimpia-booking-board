@@ -13,7 +13,9 @@ type Props = {
   open: boolean;
   onClose: () => void;
   initialSections: PrintSections;
-  onConfirmPrint: (sections: PrintSections) => void;
+  initialLimit: number | null;
+  totalBookings: number;
+  onConfirmPrint: (sections: PrintSections, limit: number | null) => void;
 };
 
 const LABELS: { key: keyof PrintSections; label: string }[] = [
@@ -27,12 +29,16 @@ const LABELS: { key: keyof PrintSections; label: string }[] = [
   { key: "note", label: "Note" },
 ];
 
-export function PrintOptionsDialog({ open, onClose, initialSections, onConfirmPrint }: Props) {
+export function PrintOptionsDialog({ open, onClose, initialSections, initialLimit, totalBookings, onConfirmPrint }: Props) {
   const [sec, setSec] = useState<PrintSections>(initialSections);
+  const [limitValue, setLimitValue] = useState<string>(initialLimit ? String(initialLimit) : "");
 
   useEffect(() => {
-    if (open) setSec(initialSections);
-  }, [open, initialSections]);
+    if (open) {
+      setSec(initialSections);
+      setLimitValue(initialLimit ? String(initialLimit) : "");
+    }
+  }, [open, initialSections, initialLimit]);
 
   function toggle<K extends keyof PrintSections>(key: K) {
     setSec((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -59,6 +65,24 @@ export function PrintOptionsDialog({ open, onClose, initialSections, onConfirmPr
             Scegli le sezioni da includere. «Completa Carlo» ripristina l&apos;anagrafica e tutti i blocchi come da scheda
             completa.
           </p>
+          <div className="print-options-limit">
+            <label className="print-options-row" htmlFor="print-limit">
+              <span>Numero massimo di schede/pagine da stampare</span>
+            </label>
+            <input
+              id="print-limit"
+              type="number"
+              min={1}
+              max={Math.max(totalBookings, 1)}
+              value={limitValue}
+              onChange={(e) => setLimitValue(e.target.value)}
+              placeholder={`Tutte (${totalBookings})`}
+              className="input"
+            />
+            <small className="print-options-small">
+              Lascia vuoto per stampare tutte le prenotazioni visibili.
+            </small>
+          </div>
           <div className="print-options-presets">
             <button type="button" className="ghost-btn" onClick={() => applyPreset(PRINT_SECTIONS_RAPIDA)}>
               Stampa rapida
@@ -82,7 +106,14 @@ export function PrintOptionsDialog({ open, onClose, initialSections, onConfirmPr
             <button
               type="button"
               className="primary-btn"
-              onClick={() => onConfirmPrint({ ...sec })}
+              onClick={() => {
+                const parsed = Number.parseInt(limitValue, 10);
+                const nextLimit =
+                  Number.isFinite(parsed) && parsed > 0
+                    ? Math.min(parsed, Math.max(totalBookings, 1))
+                    : null;
+                onConfirmPrint({ ...sec }, nextLimit);
+              }}
             >
               <Printer size={15} />
               Stampa

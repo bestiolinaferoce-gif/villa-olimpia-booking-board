@@ -54,6 +54,7 @@ type Props = {
   generatedAtLabel: string;
   /** Se assente, comportamento = scheda completa (retrocompatibile). */
   sections?: PrintSections;
+  limit?: number | null;
 };
 
 export function BoardPrintDocument({
@@ -61,14 +62,20 @@ export function BoardPrintDocument({
   monthLabel,
   generatedAtLabel,
   sections: sectionsProp,
+  limit,
 }: Props) {
   const sec: PrintSections = sectionsProp ?? PRINT_SECTIONS_FULL;
+  const bookingsToPrint = typeof limit === "number" && limit > 0 ? bookings.slice(0, limit) : bookings;
 
   const showEconomicoBlock =
     sec.totalePrenotazione ||
     sec.riepilogoEconomicoDettagliato ||
     sec.caparra ||
     sec.saldo;
+
+  if (bookingsToPrint.length === 0) {
+    return null;
+  }
 
   return (
     <div className="board-print-document">
@@ -77,11 +84,11 @@ export function BoardPrintDocument({
           <strong>Filtro vista:</strong> {monthLabel} · <strong>Generato:</strong> {generatedAtLabel}
         </p>
         <p>
-          <strong>Prenotazioni incluse:</strong> {bookings.length}
+          <strong>Prenotazioni incluse:</strong> {bookingsToPrint.length}
         </p>
       </div>
 
-      {bookings.map((b, idx) => {
+      {bookingsToPrint.map((b) => {
         const p = b.guestProfile;
         const displayName =
           p?.surname || p?.firstName
@@ -104,7 +111,6 @@ export function BoardPrintDocument({
           <article
             key={b.id}
             className="board-print-sheet"
-            style={idx < bookings.length - 1 ? { pageBreakAfter: "always" } : undefined}
           >
             <header className="board-print-header">
               <h1>{STRUCTURE_LINE}</h1>

@@ -4,8 +4,124 @@ import type { Booking } from "@/lib/types";
 const BASE = process.env.KV_REST_API_URL ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
 const KEY = "vob_bookings";
+const PROPERTY = "villa-olimpia";
+const N8N_BOOKING_WEBHOOK_URL = process.env.N8N_BOOKING_WEBHOOK_URL ?? "";
+const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET ?? "";
 
 type KVPayload = { v: number; ts: string; data: Booking[] };
+type BookingEventName = "BOOKING_CREATED" | "BOOKING_MODIFIED" | "BOOKING_CANCELLED" | "DEPOSIT_RECEIVED";
+type BookingEventPayload = {
+  event: BookingEventName;
+  bookingId: string;
+  property: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  checkin: string;
+  checkout: string;
+  nights: number;
+  guests: number;
+  lodge: string;
+  totalAmount: number;
+  depositAmount: number;
+  depositPaid: boolean;
+  notes: string;
+  source: "booking-board";
+};
+
+function bookingUpdatedMs(booking: Booking): number {
+  const ts = Date.parse(booking.updatedAt || booking.createdAt || "");
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function calculateNights(checkIn: string, checkOut: string) {
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+function toBookingEvent(event: BookingEventName, booking: Booking): BookingEventPayload {
+  return {
+    event,
+    bookingId: booking.id,
+    property: PROPERTY,
+    guestName: booking.guestName,
+    guestEmail: "",
+    guestPhone: "",
+    checkin: booking.checkIn,
+    checkout: booking.checkOut,
+    nights: calculateNights(booking.checkIn, booking.checkOut),
+    guests: booking.guestsCount,
+    lodge: booking.lodge,
+    totalAmount: booking.totalAmount,
+    depositAmount: booking.depositAmount,
+    depositPaid: booking.depositReceived,
+    notes: booking.notes,
+    source: "booking-board",
+  };
+}
+
+function hasBookingChanged(previous: Booking, current: Booking) {
+  return previous.guestName !== current.guestName ||
+    previous.lodge !== current.lodge ||
+    previous.checkIn !== current.checkIn ||
+    previous.checkOut !== current.checkOut ||
+    previous.status !== current.status ||
+    previous.channel !== current.channel ||
+    previous.notes !== current.notes ||
+    previous.guestsCount !== current.guestsCount ||
+    previous.totalAmount !== current.totalAmount ||
+    previous.depositAmount !== current.depositAmount ||
+    previous.depositReceived !== current.depositReceived;
+}
+
+function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking[]) {
+  const previousMap = new Map(previousBookings.map((booking) => [booking.id, booking]));
+  const nextMap = new Map(nextBookings.map((booking) => [booking.id, booking]));
+  const events: BookingEventPayload[] = [];
+
+  for (const booking of nextBookings) {
+    const previous = previousMap.get(booking.id);
+    if (!previous) {
+      events.push(toBookingEvent("BOOKING_CREATED", booking));
+      continue;
+    }
+    if (!previous.depositReceived && booking.depositReceived) {
+      events.push(toBookingEvent("DEPOSIT_RECEIVED", booking));
+      continue;
+    }
+    if (previous.status !== "cancelled" && booking.status === "cancelled") {
+      events.push(toBookingEvent("BOOKING_CANCELLED", booking));
+      continue;
+    }
+    if (hasBookingChanged(previous, booking)) {
+      events.push(toBookingEvent("BOOKING_MODIFIED", booking));
+    }
+  }
+
+  for (const booking of previousBookings) {
+    if (!nextMap.has(booking.id)) {
+      events.push(toBookingEvent("BOOKING_CANCELLED", booking));
+    }
+  }
+
+  return events;
+}
+
+async function notifyN8N(events: BookingEventPayload[]) {
+  if (!N8N_BOOKING_WEBHOOK_URL || events.length === 0) return;
+  await Promise.allSettled(events.map((event) =>
+    fetch(N8N_BOOKING_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-webhook-secret": N8N_WEBHOOK_SECRET,
+      },
+      body: JSON.stringify(event),
+    })
+  ));
+}
 
 async function readKV(): Promise<KVPayload | null> {
   if (!BASE || !TOKEN) return null;
@@ -44,12 +160,25 @@ export async function POST(req: NextRequest) {
 
     const current = await readKV();
     const existing = (current?.data ?? []) as Booking[];
-    const existingIds = new Set(existing.map((b) => b.id));
+    const mergedMap = new Map(existing.map((booking) => [booking.id, booking]));
+    let mergedCount = 0;
+    let updatedCount = 0;
 
-    const toAdd = incoming.filter((b) => b && b.id && !existingIds.has(b.id));
-    const merged = [...existing, ...toAdd].sort((a, b) =>
-      a.checkIn.localeCompare(b.checkIn)
-    );
+    for (const booking of incoming) {
+      if (!booking || !booking.id) continue;
+      const previous = mergedMap.get(booking.id);
+      if (!previous) {
+        mergedMap.set(booking.id, booking);
+        mergedCount += 1;
+        continue;
+      }
+      if (bookingUpdatedMs(booking) > bookingUpdatedMs(previous)) {
+        mergedMap.set(booking.id, { ...previous, ...booking });
+        updatedCount += 1;
+      }
+    }
+
+    const merged = Array.from(mergedMap.values()).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
 
     const newPayload: KVPayload = {
       v: (current?.v ?? 0) + 1,
@@ -58,10 +187,13 @@ export async function POST(req: NextRequest) {
     };
 
     await writeKV(newPayload);
+    await notifyN8N(collectBookingEvents(existing, merged));
 
     return NextResponse.json({
-      merged: toAdd.length,
+      merged: mergedCount,
+      updated: updatedCount,
       total: merged.length,
+      v: newPayload.v,
     });
   } catch (err) {
     return NextResponse.json(

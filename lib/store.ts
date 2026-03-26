@@ -39,7 +39,7 @@ type BookingState = {
   importBookingsMerge: (incoming: Booking[]) => { merged: number; skipped: number };
   exportBookings: () => Booking[];
   forceSyncToCloud: () => Promise<void>;
-  syncLocalToCloud: () => Promise<{ merged: number; total: number }>;
+  syncLocalToCloud: () => Promise<{ merged: number; updated: number; total: number }>;
   toast: { message: string; type: "success" | "error" } | null;
   showToast: (message: string, type?: "success" | "error") => void;
   clearToast: () => void;
@@ -172,6 +172,21 @@ function mergeEnrichedLocal(merged: Booking[], serverRows: Booking[]): boolean {
     if (bookingUpdatedMs(m) > bookingUpdatedMs(s)) return true;
   }
   return false;
+}
+
+function normalizePayload(payload: { v?: number; data?: Booking[] } | Booking[] | null): { version: number; data: Booking[] } {
+  if (!payload) return { version: 0, data: [] }
+  if (Array.isArray(payload)) return { version: 0, data: payload }
+  return { version: payload.v ?? 0, data: payload.data ?? [] }
+}
+
+async function fetchCloudPayload(): Promise<{ version: number; data: Booking[] }> {
+  const response = await fetch("/api/bookings", { cache: "no-store" })
+  if (!response.ok) {
+    throw new Error("cloud fetch failed")
+  }
+  const payload = (await response.json()) as { v?: number; data?: Booking[] } | Booking[]
+  return normalizePayload(payload)
 }
 
 function persistSettings(patch: Partial<{ monthTheme: boolean; serverVersion: number }>): void {
@@ -507,21 +522,22 @@ export const useBookingStore = create<BookingState>((set, get) => {
       return;
     }
     try {
-      const r = await fetch("/api/bookings", {
+      const mergeRes = await fetch("/api/bookings/merge-local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookings: cur }),
       });
-      if (r.ok) {
-        const res = (await r.json()) as { ok: boolean; v?: number };
-        if (typeof res.v === "number") {
-          set({ serverVersion: res.v, syncError: false });
-          persistSettings({ serverVersion: res.v });
-        }
-        get().showToast(`✓ ${cur.length} prenotazioni caricate sul cloud (v${res.v ?? "?"}).`);
-      } else {
+      if (!mergeRes.ok) {
         get().showToast("Errore durante il caricamento sul cloud.", "error");
+        return;
       }
+
+      const cloud = await fetchCloudPayload()
+      const merged = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), cur)
+      set({ bookings: merged, serverVersion: cloud.version, syncError: false })
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+      persistSettings({ serverVersion: cloud.version })
+      get().showToast(`✓ Sync completata. Cloud aggiornato e board riallineata (v${cloud.version || "?"}).`)
     } catch {
       set({ syncError: true });
       get().showToast("Errore di rete durante il sync.", "error");
@@ -533,7 +549,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
     if (local.length === 0) {
       get().showToast("Nessuna prenotazione locale da sincronizzare.", "error");
-      return { merged: 0, total: 0 };
+      return { merged: 0, updated: 0, total: 0 };
     }
 
     try {
@@ -544,26 +560,34 @@ export const useBookingStore = create<BookingState>((set, get) => {
       });
       const data = (await res.json()) as {
         merged?: number;
+        updated?: number;
         total?: number;
         error?: string;
+        v?: number;
       };
 
       if (res.ok) {
+        const cloud = await fetchCloudPayload();
+        const mergedRows = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), local);
+        set({ bookings: mergedRows, serverVersion: cloud.version, syncError: false });
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedRows));
+          persistSettings({ serverVersion: cloud.version });
+        }
         get().showToast(
-          `Sync completata: ${data.merged ?? 0} nuove prenotazioni aggiunte (totale: ${data.total ?? 0}).`
+          `Aggiornamento completato: +${data.merged ?? 0} nuove, ${data.updated ?? 0} aggiornate (totale cloud: ${data.total ?? 0}).`
         );
-        await get().load();
-        return { merged: data.merged ?? 0, total: data.total ?? 0 };
+        return { merged: data.merged ?? 0, updated: data.updated ?? 0, total: data.total ?? 0 };
       } else {
         get().showToast(
           "Errore durante la sincronizzazione: " + (data.error ?? "unknown"),
           "error"
         );
-        return { merged: 0, total: 0 };
+        return { merged: 0, updated: 0, total: 0 };
       }
     } catch {
       get().showToast("Errore di rete durante la sincronizzazione.", "error");
-      return { merged: 0, total: 0 };
+      return { merged: 0, updated: 0, total: 0 };
     }
   },
   };
