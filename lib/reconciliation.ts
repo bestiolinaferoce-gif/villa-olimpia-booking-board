@@ -65,7 +65,7 @@ function isLikelyDuplicate(a: Booking, b: Booking): boolean {
     sameDates ||
     (sameCheckIn && shareGuestIdentity(a, b)) ||
     (closeStay && sameAmount && shareGuestIdentity(a, b)) ||
-    (sameCheckIn && sameAmount && sameDeposit)
+    (sameCheckIn && sameAmount && sameDeposit && shareGuestIdentity(a, b))
   )
 }
 
