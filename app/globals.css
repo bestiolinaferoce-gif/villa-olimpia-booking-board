@@ -510,6 +510,50 @@ textarea {
   gap: 8px;
 }
 
+.export-format-menu {
+  min-width: 220px;
+  padding: 8px;
+}
+
+.export-format-title {
+  margin: 0 0 6px 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.export-format-list {
+  display: grid;
+  gap: 4px;
+}
+
+.export-format-item {
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.export-format-item:hover {
+  background: var(--accent-faint);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--accent);
+}
+
+.export-trigger .export-chevron {
+  opacity: 0.75;
+  margin-left: 2px;
+}
+
 .dot {
   width: 10px;
   height: 10px;

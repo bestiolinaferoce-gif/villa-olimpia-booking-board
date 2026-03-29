@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import * as Popover from "@radix-ui/react-popover";
 import {
   Calendar,
+  ChevronDown,
   CloudUpload,
   Download,
   FileText,
@@ -13,7 +15,9 @@ import {
   Printer,
   Upload,
 } from "lucide-react";
+import { useState } from "react";
 import { format } from "date-fns";
+import type { BookingExportFormat } from "@/lib/bookingExportFormats";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
 import { SummaryBar } from "@/components/SummaryBar";
@@ -40,7 +44,7 @@ type ToolbarProps = {
   onNewBooking: () => void;
   onEmailImport: () => void;
   onImportClick: () => void;
-  onExport: () => void;
+  onExportFormat: (format: BookingExportFormat) => void;
   onCopyIcal: () => void;
   onForceSync: () => void;
   onSyncLocal?: () => void;
@@ -74,7 +78,7 @@ export function Toolbar({
   onNewBooking,
   onEmailImport,
   onImportClick,
-  onExport,
+  onExportFormat,
   onCopyIcal,
   onForceSync,
   onSyncLocal,
@@ -89,6 +93,8 @@ export function Toolbar({
   onLogout,
   onOpenPrintOptions,
 }: ToolbarProps) {
+  const [exportOpen, setExportOpen] = useState(false);
+
   return (
     <section className="toolbar no-print">
       <div className="title-row">
@@ -153,10 +159,53 @@ export function Toolbar({
             <Upload size={15} />
             Import JSON
           </button>
-          <button type="button" className="ghost-btn" onClick={onExport}>
-            <Download size={15} />
-            Export JSON
-          </button>
+          <Popover.Root open={exportOpen} onOpenChange={setExportOpen}>
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                className="ghost-btn export-trigger"
+                aria-expanded={exportOpen}
+                aria-haspopup="dialog"
+                title="Esporta prenotazioni"
+              >
+                <Download size={15} />
+                Esporta
+                <ChevronDown size={14} className="export-chevron" aria-hidden />
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                className="popover-content export-format-menu"
+                sideOffset={6}
+                align="start"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                <p className="export-format-title">Formato</p>
+                <div className="export-format-list">
+                  <button
+                    type="button"
+                    className="export-format-item"
+                    onClick={() => {
+                      onExportFormat("json");
+                      setExportOpen(false);
+                    }}
+                  >
+                    Esporta JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="export-format-item"
+                    onClick={() => {
+                      onExportFormat("txt-notebooklm");
+                      setExportOpen(false);
+                    }}
+                  >
+                    Esporta TXT per NotebookLM
+                  </button>
+                </div>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
           <button
             type="button"
             className="ghost-btn"

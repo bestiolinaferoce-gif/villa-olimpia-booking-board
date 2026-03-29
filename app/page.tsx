@@ -23,6 +23,7 @@ import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
+import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
 import { reconcileBookings } from "@/lib/reconciliation";
 
 export default function Home() {
@@ -168,18 +169,8 @@ export default function Home() {
     reader.readAsText(file);
   }
 
-  function onExport() {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      bookings: exportBookings(),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `villa-olimpia-booking-board-${format(monthDate, "yyyy-MM")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  function onExportFormat(fmt: BookingExportFormat) {
+    runBookingExport(fmt, exportBookings(), { jsonFilenameMonth: monthDate });
   }
 
   function onCopyIcal() {
@@ -333,7 +324,7 @@ export default function Home() {
         onNewBooking={() => openNewBooking()}
         onEmailImport={() => setEmailImportOpen(true)}
         onImportClick={onImportClick}
-        onExport={onExport}
+        onExportFormat={onExportFormat}
         onCopyIcal={onCopyIcal}
         onForceSync={() => forceSyncToCloud()}
         onSyncLocal={() => syncLocalToCloud()}
