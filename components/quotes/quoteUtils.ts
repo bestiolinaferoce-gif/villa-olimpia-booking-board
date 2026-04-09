@@ -8,6 +8,8 @@ export type QuoteFormState = {
   checkOut: string;
   guests: number;
   lodgeId: QuoteLodgeId;
+  /** Lodge secondaria per tabella confronto qualitativo nel template (opzionale). */
+  compareLodgeId: QuoteLodgeId | "";
   /** Tariffa per notte (€); il totale soggiorno = notti × tariffa. */
   dailyRate: number;
   /** 0, 5 o 10 — applicato sul totale soggiorno calcolato. */

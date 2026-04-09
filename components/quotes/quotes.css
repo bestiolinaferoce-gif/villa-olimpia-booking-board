@@ -267,6 +267,47 @@
 .quotes-btn-ghost:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
 }
+.quotes-btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  color: var(--q-muted);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.quotes-page[data-theme="avorio-navy"] .quotes-btn-ghost:disabled {
+  border-color: rgba(30, 41, 59, 0.2);
+}
+
+.quotes-export-hint {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--q-border);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--q-text);
+}
+.quotes-export-hint strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--q-gold-soft);
+}
+.quotes-export-hint ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.quotes-export-hint li {
+  margin-bottom: 4px;
+  color: var(--q-muted);
+}
+.quotes-page[data-theme="avorio-navy"] .quotes-export-hint {
+  background: rgba(30, 41, 59, 0.08);
+}
 
 /* Template stampa / PDF */
 .quotes-template-wrap {
@@ -677,6 +718,157 @@
   font-size: 0.75rem;
   color: var(--qt-footer, #718096);
   text-align: center;
+}
+
+/* Template proposta strutturata — copertina, confronto, step prenotazione */
+.qt-header-tagline {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  opacity: 0.92;
+  font-weight: 500;
+}
+.qt-cover-meta {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  text-align: left;
+}
+.qt-cover-meta-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--qt-header-text, #f8f6f0);
+}
+.qt-cover-meta-item svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.qt-cover-meta-label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+.qt-cover-meta-value {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.qt-cover-meta-value a {
+  color: inherit;
+  text-decoration: underline;
+}
+.qt-cover-meta-contacts {
+  grid-column: 1 / -1;
+}
+.qt-block-text {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  color: var(--qt-body-text, #2d3748);
+  line-height: 1.5;
+}
+.qt-block-lead {
+  font-weight: 600;
+  font-size: 1rem;
+}
+.qt-subsection-title {
+  margin: 14px 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--qt-section-accent, #0a1628);
+}
+.qt-bullet-list {
+  margin: 0 0 10px;
+  padding-left: 1.2rem;
+  font-size: 0.92rem;
+  color: var(--qt-body-text, #2d3748);
+  line-height: 1.45;
+}
+.qt-bullet-list li {
+  margin-bottom: 4px;
+}
+.qt-econ-intro {
+  margin-bottom: 12px !important;
+}
+.qt-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.qt-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: var(--qt-body-text, #2d3748);
+  border: 1px solid var(--qt-box-border, #d9e2ec);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.qt-compare-table th,
+.qt-compare-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--qt-box-border, #d9e2ec);
+  vertical-align: top;
+  text-align: left;
+}
+.qt-compare-table thead th {
+  background: var(--qt-box-bg, #f1f4f8);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--qt-box-label, #4a5568);
+}
+.qt-compare-lodge {
+  width: 12%;
+  min-width: 5rem;
+  font-weight: 700;
+  color: var(--qt-section-accent, #0a1628);
+  background: rgba(201, 162, 39, 0.08);
+}
+.qt-compare-list {
+  margin: 0;
+  padding-left: 1rem;
+  line-height: 1.4;
+}
+.qt-compare-list li {
+  margin-bottom: 3px;
+}
+.qt-compare-cell-lead {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.qt-compare-cell-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--qt-box-label, #4a5568);
+}
+.qt-cta-heading {
+  margin: 0 0 12px !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: var(--qt-body-text, #2d3748) !important;
+  text-align: left;
+}
+.qt-step-list {
+  margin: 0 0 16px;
+  padding-left: 1.25rem;
+  text-align: left;
+  line-height: 1.5;
+  color: var(--qt-body-text, #2d3748);
+  font-size: 0.9rem;
+}
+.qt-step-list li {
+  margin-bottom: 8px;
+}
+.qt-cta-strong {
+  margin-top: 4px !important;
 }
 
 @media print {

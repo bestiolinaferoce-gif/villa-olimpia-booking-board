@@ -100,6 +100,31 @@ export function QuoteForm({
         ) : null}
       </div>
 
+      <div className="quotes-field">
+        <label htmlFor="q-compare">
+          <Home size={14} style={ic} /> Confronta con (opzionale)
+        </label>
+        <select
+          id="q-compare"
+          value={state.compareLodgeId}
+          onChange={(e) =>
+            onChange({
+              compareLodgeId: e.target.value as QuoteFormState["compareLodgeId"],
+            })
+          }
+        >
+          <option value="">Nessun confronto nel documento</option>
+          {quoteLodges.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+        <p className="quotes-hint">
+          Aggiunge una tabella qualitativa nel PDF; i prezzi restano solo sulla lodge principale.
+        </p>
+      </div>
+
       <div className="qt-grid-2 quotes-date-grid">
         <div className="quotes-field" style={{ marginBottom: 0 }}>
           <label htmlFor="q-in">

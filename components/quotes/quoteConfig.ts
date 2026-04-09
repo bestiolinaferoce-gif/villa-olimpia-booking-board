@@ -162,6 +162,34 @@ export const policies = {
     "Oltre tale termine l’acconto versato non è rimborsabile, salvo diversa pattuizione scritta.",
   bookingNote:
     "La prenotazione si intende confermata dopo il versamento dell’acconto indicato e la ricezione di conferma da parte della struttura.",
+  touristTaxNote:
+    "Tassa di soggiorno: importo stimato in base a numero ospiti e notti; conferma definitiva al check-in secondo normativa locale.",
+} as const;
+
+/** Testi struttura documento preventivo / proposta (allineati al flusso commerciale reale). */
+export const quoteDocument = {
+  docTitle: "Proposta di soggiorno",
+  docBadge: "Preventivo strutturato",
+  /** Intestazione copertina: sottotitolo istituzionale */
+  headerTagline: "Villa ricettiva — Capo Rizzuto (KR), Calabria",
+  /** Intro personalizzata: il nome cliente viene interpolato in QuoteTemplate */
+  clientGreetingLead: "Gentile",
+  availabilityIntro:
+    "In base al periodo e al numero di ospiti indicati, verifichiamo la disponibilità del calendario lodge e proponiamo la soluzione più coerente con le vostre esigenze. Eventuali alternative (date o tipologia alloggio) vengono comunicate in fase di confronto diretto.",
+  choiceGuide:
+    "Per orientare la scelta: lodge con maggiore capienza o più ambienti (es. Giglio, Frangipane, Geranio) sono spesso indicate per famiglie o gruppi; soluzioni più compatte possono risultare ideali per coppie o soggiorni brevi. La proposta economica sotto riportata si riferisce esclusivamente alla lodge selezionata nel modulo.",
+  villaLead:
+    "Villa Olimpia è una struttura ricettiva immersa nel verde, con gestione diretta: prenotazioni, pagamenti e assistenza in soggiorno con comunicazioni chiare e tempestive.",
+  compareFootnote:
+    "Il confronto è indicativo su composizione e caratteristiche descrittive. Tariffe e disponibilità della seconda lodge non sono incluse in questo preventivo salvo esplicita integrazione scritta.",
+  economicSolutionLead:
+    "Importi riferiti alla soluzione lodge indicata nel riquadro proposta. Acconto e saldo sono calcolati sul totale complessivo (soggiorno, extra selezionati, tassa di soggiorno stimata).",
+  bookingSteps: [
+    "Confermare via email o WhatsApp interesse per il periodo e la lodge proposta.",
+    "Ricevere da Villa Olimpia conferma di disponibilità e istruzioni per l’acconto.",
+    "Effettuare il bonifico dell’acconto (30%) e inviare la ricevuta.",
+    "Ricevere conferma scritta di prenotazione; saldo (70%) al check-in come da condizioni.",
+  ] as const,
 } as const;
 
 /** Lodge: descrizioni + metadati strutturali solo se indicati dal gestore (no supposizioni). */
@@ -228,6 +256,94 @@ export const quoteLodges = [
 export type QuoteLodgeId = (typeof quoteLodges)[number]["id"];
 export type QuoteLodge = (typeof quoteLodges)[number];
 
+/** Dettaglio descrittivo per sezione lodge / confronto (oltre a shortDescription). */
+export const lodgeQuoteExtras: Partial<
+  Record<
+    QuoteLodgeId,
+    {
+      compositionNote: string;
+      strengths: readonly string[];
+      equipment: readonly string[];
+    }
+  >
+> = {
+  Frangipane: {
+    compositionNote:
+      "Fino a 6 posti letto. Ambiente luminoso e spazioso, adatto a famiglie numerose o gruppi che cercano comfort.",
+    strengths: [
+      "Elevata capienza",
+      "Ambienti luminosi",
+      "Adatta a soggiorni di media e lunga durata",
+    ],
+    equipment: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Dotazioni bagno e camere secondo planimetria in struttura",
+    ],
+  },
+  Giglio: {
+    compositionNote:
+      "Fino a 5 posti letto. Soluzione equilibrata tra spazio e gestione pratica del soggiorno.",
+    strengths: [
+      "Bilanciamento spazio / comfort",
+      "Adatta a famiglie e piccoli gruppi",
+      "Soggiorno tranquillo in contesto villa",
+    ],
+    equipment: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Disposizione interna confermata al check-in",
+    ],
+  },
+  Orchidea: {
+    compositionNote:
+      "Dotazione con 2 bagni; spazi armoniosi per un soggiorno comodo in villa.",
+    strengths: [
+      "Due bagni",
+      "Spazi curati",
+      "Adatta a nuclei che privilegiano praticità",
+    ],
+    equipment: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Secondo bagno per maggiore comodità",
+    ],
+  },
+  Geranio: {
+    compositionNote:
+      "Due camere da letto e due bagni; organizzazione interna adatta a famiglie.",
+    strengths: [
+      "Layout con 2 camere e 2 bagni",
+      "Praticità per famiglie",
+      "Ambiente riservato in villa",
+    ],
+    equipment: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Camere e bagni secondo scheda struttura",
+    ],
+  },
+};
+
+export function lodgeQuotePresentation(lodge: QuoteLodge): {
+  composition: string;
+  strengths: string[];
+  equipment: string[];
+} {
+  const extras = lodgeQuoteExtras[lodge.id];
+  return {
+    composition: extras?.compositionNote ?? lodge.shortDescription,
+    strengths: extras?.strengths
+      ? [...extras.strengths]
+      : [lodge.shortDescription],
+    equipment: extras?.equipment
+      ? [...extras.equipment]
+      : [
+          "Dotazioni e disposizione interna confermate in struttura al momento del check-in.",
+        ],
+  };
+}
+
 /** Riga riassuntiva capienza / camere (solo campi presenti sulla lodge). */
 export function lodgeStructuralLine(lodge: QuoteLodge): string | null {
   const row = lodge as Record<string, unknown>;
@@ -252,6 +368,10 @@ export const villaIntro = {
 export const villaStructure = {
   pool: "Area piscina per relax e tempo libero (utilizzo secondo regolamento interno e stagionalità).",
   garden: "Giardino e spazi esterni curati per vivere l’aperto in sicurezza.",
+  beach:
+    "Vicinanza al litorale ionico e alle spiagge della zona, inclusa l’area di Spiaggia dei Gigli; tempi di percorrenza verso la spiaggia prescelta variabili in base alla destinazione.",
+  territory:
+    "Territorio di Capo Rizzuto (KR): mare, natura e servizi locali raggiungibili in auto; suggerimenti su itinerari e spiagge su richiesta in fase di soggiorno.",
   sea: "Posizione favorevole verso il litorale ionico; tempi di percorrenza verso spiagge e punti di interesse variabili in base alla destinazione scelta.",
 } as const;
 

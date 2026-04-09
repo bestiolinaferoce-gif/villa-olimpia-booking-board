@@ -43,6 +43,7 @@ const initial: QuoteFormState = {
   checkOut: "",
   guests: 2,
   lodgeId: "Frangipane",
+  compareLodgeId: "",
   dailyRate: 0,
   discountPercent: 0,
   includeSanitization: false,
@@ -61,6 +62,11 @@ export function QuotesPage() {
   const lodge =
     quoteLodges.find((l) => l.id === state.lodgeId) ?? quoteLodges[0];
   const lodgeFactsLine = lodgeStructuralLine(lodge);
+  const compareLodge =
+    state.compareLodgeId &&
+    state.compareLodgeId !== state.lodgeId
+      ? quoteLodges.find((l) => l.id === state.compareLodgeId)
+      : undefined;
 
   const canExport =
     state.clientName.trim().length > 0 &&
@@ -96,20 +102,17 @@ export function QuotesPage() {
             themeId={themeId}
             onThemeChange={setThemeId}
           />
-          <QuotePdfExport targetRef={templateRef} disabled={!canExport} />
           {!canExport && (
-            <p
-              style={{
-                marginTop: 12,
-                fontSize: "0.82rem",
-                color: "var(--q-muted)",
-                maxWidth: 380,
-              }}
-            >
-              Compila cliente, date valide (check-out dopo check-in) e tariffa
-              giornaliera (maggiore di zero) per abilitare PDF e stampa.
-            </p>
+            <div className="quotes-export-hint no-print" role="status">
+              <strong>Per abilitare «Scarica PDF» e «Stampa / PDF sistema»</strong>
+              <ul>
+                <li>inserire il nome cliente</li>
+                <li>scegliere date valide (check-out dopo check-in, almeno una notte)</li>
+                <li>impostare la tariffa giornaliera maggiore di zero</li>
+              </ul>
+            </div>
           )}
+          <QuotePdfExport targetRef={templateRef} disabled={!canExport} />
         </div>
 
         <div className="quotes-template-wrap">
@@ -120,9 +123,11 @@ export function QuotesPage() {
             checkIn={state.checkIn}
             checkOut={state.checkOut}
             guests={state.guests}
+            lodgeId={lodge.id}
             lodgeName={lodge.name}
             lodgeDescription={lodge.shortDescription}
             lodgeFactsLine={lodgeFactsLine}
+            compareLodge={compareLodge}
             includeSanitization={state.includeSanitization}
             computed={computed}
           />
