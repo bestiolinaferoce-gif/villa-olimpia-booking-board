@@ -69,8 +69,9 @@ export function parseAirbnbICal(icsContent: string): AirbnbICalEvent[] {
   return events;
 }
 
+/** ID senza prefisso — compatibile con le prenotazioni Airbnb inserite manualmente */
 export function airbnbBookingId(confirmationCode: string): string {
-  return `airbnb_${confirmationCode}`;
+  return confirmationCode;
 }
 
 export function icalEventToBooking(
@@ -92,6 +93,7 @@ export function icalEventToBooking(
     totalAmount: 0,
     depositAmount: 0,
     depositReceived: false,
+    isNew: false,
     createdAt: now,
     updatedAt: now,
     dataOrigin: "sync",
