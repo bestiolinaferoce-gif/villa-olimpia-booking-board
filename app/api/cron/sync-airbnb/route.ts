@@ -121,9 +121,13 @@ export async function GET(req: NextRequest) {
 
   if (totalChanges > 0) {
     const url = new URL("/api/bookings", req.url).toString();
+    const writeToken = process.env.API_WRITE_SECRET ?? process.env.CRON_SECRET ?? "";
     await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(writeToken ? { "x-internal-token": writeToken } : {}),
+      },
       body: JSON.stringify(bookings),
     });
   }
