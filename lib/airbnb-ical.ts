@@ -28,7 +28,7 @@ function extractGuestName(description: string, summary: string): string {
   const m2 = description.match(/Reservation by (.+?)(?:\\n|\n|$)/i);
   if (m2) return m2[1].trim();
   if (/not available|blocked|closed|unavailable/i.test(summary)) return "";
-  return summary === "Reserved" ? "Ospite Airbnb" : summary;
+  return summary === "Reserved" ? "Ospite Airbnb" : (summary || "Ospite Airbnb");
 }
 
 function extractConfirmationCode(uid: string, description: string): string {
@@ -54,8 +54,10 @@ export function parseAirbnbICal(icsContent: string): AirbnbICalEvent[] {
     const description = get("DESCRIPTION");
     const dtstart = parseICalDate(get("DTSTART"));
     const dtend = parseICalDate(get("DTEND"));
+    const status = get("STATUS");
 
     if (!dtstart || !dtend) continue;
+    if (status === "CANCELLED") continue;
     if (/not available|blocked|closed|unavailable/i.test(summary)) continue;
 
     const confirmationCode = extractConfirmationCode(uid, description);
