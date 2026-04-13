@@ -51,6 +51,7 @@ interface SyncResult {
   fetched: number;
   created: number;
   updated: number;
+  cancelled: number;
   skipped: number;
   error?: string;
 }
@@ -59,7 +60,7 @@ async function syncProperty(
   config: AirbnbSyncConfig,
   existing: Booking[]
 ): Promise<{ bookings: Booking[]; result: SyncResult }> {
-  const result: SyncResult = { lodge: config.lodge, fetched: 0, created: 0, updated: 0, skipped: 0 };
+  const result: SyncResult = { lodge: config.lodge, fetched: 0, created: 0, updated: 0, cancelled: 0, skipped: 0 };
 
   let icsText: string;
   try {
@@ -84,14 +85,29 @@ async function syncProperty(
       result.created++;
     } else {
       const b = updated[idx];
-      if (b.checkIn !== event.dtstart || b.checkOut !== event.dtend || b.guestName !== event.guestName) {
-        updated[idx] = { ...b, checkIn: event.dtstart, checkOut: event.dtend, guestName: event.guestName, updatedAt: now, dataOrigin: "sync" };
+      const dataChanged = b.checkIn !== event.dtstart || b.checkOut !== event.dtend || b.guestName !== event.guestName;
+      const wasReactivated = b.status === "cancelled";
+      if (dataChanged || wasReactivated) {
+        updated[idx] = { ...b, checkIn: event.dtstart, checkOut: event.dtend, guestName: event.guestName, status: "confirmed", updatedAt: now, dataOrigin: "sync" };
         result.updated++;
       } else {
         result.skipped++;
       }
     }
   }
+
+  // Marca come cancelled le prenotazioni Airbnb di questo lodge non presenti nel feed
+  const syncedIds = new Set(events.map((e) => airbnbBookingId(e.confirmationCode)));
+  for (let i = 0; i < updated.length; i++) {
+    const b = updated[i];
+    if (b.lodge === config.lodge && b.channel === "airbnb" && b.status !== "cancelled") {
+      if (!syncedIds.has(b.id)) {
+        updated[i] = { ...b, status: "cancelled", updatedAt: now, dataOrigin: "sync" };
+        result.cancelled++;
+      }
+    }
+  }
+
   return { bookings: updated, result };
 }
 
@@ -117,7 +133,7 @@ export async function GET(req: NextRequest) {
     results.push(result);
   }
 
-  const totalChanges = results.reduce((s, r) => s + r.created + r.updated, 0);
+  const totalChanges = results.reduce((s, r) => s + r.created + r.updated + r.cancelled, 0);
 
   if (totalChanges > 0) {
     const url = new URL("/api/bookings", req.url).toString();
