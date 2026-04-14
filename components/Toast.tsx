@@ -14,7 +14,8 @@ export function Toast() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(clearToast, TOAST_DURATION_MS);
+    const ms = typeof toast.durationMs === "number" && toast.durationMs > 0 ? toast.durationMs : TOAST_DURATION_MS;
+    const timer = setTimeout(clearToast, ms);
     return () => clearTimeout(timer);
   }, [toast, clearToast]);
 
@@ -54,7 +55,7 @@ export function Toast() {
           lineHeight: "1.4",
         }}
       >
-        <span style={{ flex: 1 }}>{toast.message}</span>
+        <span style={{ flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{toast.message}</span>
         <button
           type="button"
           onClick={clearToast}

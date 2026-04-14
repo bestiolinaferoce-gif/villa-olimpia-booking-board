@@ -33,9 +33,14 @@ export function MigrationHelper() {
       return;
     }
 
+    const migrateHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    const writeToken = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+    if (typeof writeToken === "string" && writeToken.length > 0) {
+      migrateHeaders["X-Internal-Token"] = writeToken;
+    }
     fetch("/api/bookings/migrate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: migrateHeaders,
       body: JSON.stringify({ bookings }),
     })
       .then(async (res) => {

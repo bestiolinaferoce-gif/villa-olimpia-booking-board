@@ -1,33 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bookingWriteAuthError, kvNotConfiguredResponse } from "@/lib/bookingsApiAuth";
 import type { Booking } from "@/lib/types";
+import {
+  notifyN8NBookingEvents,
+  type N8nBookingEventName,
+  type N8nBookingEventPayload,
+} from "@/lib/n8nBookingWebhook";
 
 const BASE = process.env.KV_REST_API_URL ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
 const KEY = "vob_bookings";
 const PROPERTY = "villa-olimpia";
-const N8N_BOOKING_WEBHOOK_URL = process.env.N8N_BOOKING_WEBHOOK_URL ?? "";
-const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET ?? "";
 
 type KVPayload = { v: number; ts: string; data: Booking[] };
-type BookingEventName = "BOOKING_CREATED" | "BOOKING_MODIFIED" | "BOOKING_CANCELLED" | "DEPOSIT_RECEIVED";
-type BookingEventPayload = {
-  event: BookingEventName;
-  bookingId: string;
-  property: string;
-  guestName: string;
-  guestEmail: string;
-  guestPhone: string;
-  checkin: string;
-  checkout: string;
-  nights: number;
-  guests: number;
-  lodge: string;
-  totalAmount: number;
-  depositAmount: number;
-  depositPaid: boolean;
-  notes: string;
-  source: "booking-board";
-};
 
 function bookingUpdatedMs(booking: Booking): number {
   const ts = Date.parse(booking.updatedAt || booking.createdAt || "");
@@ -41,7 +26,7 @@ function calculateNights(checkIn: string, checkOut: string) {
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
-function toBookingEvent(event: BookingEventName, booking: Booking): BookingEventPayload {
+function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookingEventPayload {
   return {
     event,
     bookingId: booking.id,
@@ -79,7 +64,7 @@ function hasBookingChanged(previous: Booking, current: Booking) {
 function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking[]) {
   const previousMap = new Map(previousBookings.map((booking) => [booking.id, booking]));
   const nextMap = new Map(nextBookings.map((booking) => [booking.id, booking]));
-  const events: BookingEventPayload[] = [];
+  const events: N8nBookingEventPayload[] = [];
 
   for (const booking of nextBookings) {
     const previous = previousMap.get(booking.id);
@@ -107,20 +92,6 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
   }
 
   return events;
-}
-
-async function notifyN8N(events: BookingEventPayload[]) {
-  if (!N8N_BOOKING_WEBHOOK_URL || events.length === 0) return;
-  await Promise.allSettled(events.map((event) =>
-    fetch(N8N_BOOKING_WEBHOOK_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-webhook-secret": N8N_WEBHOOK_SECRET,
-      },
-      body: JSON.stringify(event),
-    })
-  ));
 }
 
 async function readKV(): Promise<KVPayload | null> {
@@ -151,6 +122,11 @@ async function writeKV(payload: KVPayload): Promise<void> {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = bookingWriteAuthError(req);
+  if (authErr) return authErr;
+
+  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+
   try {
     const body = (await req.json()) as { bookings: Booking[] };
     const incoming = body?.bookings;
@@ -187,7 +163,10 @@ export async function POST(req: NextRequest) {
     };
 
     await writeKV(newPayload);
-    await notifyN8N(collectBookingEvents(existing, merged));
+    await notifyN8NBookingEvents(
+      collectBookingEvents(existing, merged),
+      "api/bookings/merge-local"
+    );
 
     return NextResponse.json({
       merged: mergedCount,

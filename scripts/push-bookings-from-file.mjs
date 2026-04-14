@@ -64,6 +64,13 @@ function channelStatus(r) {
   return { channel, status };
 }
 
+function writeAuthHeaders() {
+  const secret = (process.env.API_WRITE_SECRET ?? process.env.CRON_SECRET ?? "").trim();
+  const headers = { "Content-Type": "application/json" };
+  if (secret) headers["X-Internal-Token"] = secret;
+  return headers;
+}
+
 const bookings = rows.map((r) => {
   const { channel, status } = channelStatus(r);
   const now = new Date().toISOString();
@@ -99,7 +106,7 @@ if (replaceAll) {
   console.warn(`[REPLACE-ALL] POST ${url} — ${bookings.length} prenotazioni (sovrascrive TUTTO il KV)`);
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: writeAuthHeaders(),
     body: JSON.stringify({ bookings }),
   });
   await printResult(res);
@@ -109,7 +116,7 @@ if (replaceAll) {
   console.log("  (solo id nuovi vengono aggiunti; nulla viene rimosso dal cloud)");
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: writeAuthHeaders(),
     body: JSON.stringify({ bookings }),
   });
   await printResult(res);

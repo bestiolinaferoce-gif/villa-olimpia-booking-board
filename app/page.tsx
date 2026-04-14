@@ -14,7 +14,7 @@ import { Toolbar } from "@/components/Toolbar";
 import { PasswordGate } from "@/components/PasswordGate";
 import { KPIPanel } from "@/components/KPIPanel";
 import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types";
-import { useBookingStore } from "@/lib/store";
+import { useBookingStore, type ImportMergeSkipDetail } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
 import { BoardPrintDocument } from "@/components/BoardPrintDocument";
@@ -25,6 +25,29 @@ import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
 import { reconcileBookings } from "@/lib/reconciliation";
+
+function formatImportMergeToast(
+  merged: number,
+  skips: ImportMergeSkipDetail[]
+): { message: string; durationMs?: number } {
+  if (skips.length === 0) {
+    return { message: `Import completato: ${merged} righe in board, nessuno scarto.` };
+  }
+  const lines: string[] = [`Import: ${merged} applicate, ${skips.length} scartate.`, ""];
+  const cap = 12;
+  for (let i = 0; i < Math.min(cap, skips.length); i++) {
+    const s = skips[i];
+    lines.push(`• ${s.id} (${s.guestName})`);
+    lines.push(`  ${s.reason}`);
+  }
+  if (skips.length > cap) {
+    lines.push("", `… e altre ${skips.length - cap}. Elenco completo in console (F12 → Console).`);
+  }
+  return {
+    message: lines.join("\n"),
+    durationMs: skips.length > 4 ? 16_000 : 10_000,
+  };
+}
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -417,17 +440,21 @@ export default function Home() {
         confirmLabel="Importa"
         onConfirm={() => {
           if (!importConfirm) return;
-          const result = importBookingsMerge(importConfirm.incoming);
+          const incomingSnapshot = importConfirm.incoming;
+          const result = importBookingsMerge(incomingSnapshot);
           setImportConfirm(null);
-          // Naviga al mese della prima prenotazione importata e azzera i filtri
-          const sorted = [...importConfirm.incoming].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+          if (result.skipDetails.length > 0) {
+            console.warn("[import JSON] righe scartate:", result.skipDetails);
+          }
+          const sorted = [...incomingSnapshot].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
           if (sorted.length > 0) {
             setStoreMonth(startOfMonth(parseISO(sorted[0].checkIn)));
           }
           setSearch("");
           setStatusFilter("all");
           setChannelFilter("all");
-          showToast(`Import completato: ${result.merged} aggiunte, ${result.skipped} scartate.`);
+          const { message, durationMs } = formatImportMergeToast(result.merged, result.skipDetails);
+          showToast(message, "success", durationMs);
         }}
         onClose={() => setImportConfirm(null)}
       />

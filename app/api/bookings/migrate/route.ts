@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
 import type { Booking } from '@/lib/types';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
@@ -21,7 +22,10 @@ async function readKV(): Promise<KVPayload> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!BASE || !TOKEN) return NextResponse.json({ ok: false }, { status: 503 });
+  const authErr = bookingWriteAuthError(req);
+  if (authErr) return authErr;
+
+  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
   try {
     const body = (await req.json()) as Booking[] | { bookings: Booking[] };
     const incoming: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);

@@ -5,13 +5,21 @@ import {
   BOOKING_CHANNELS,
   BOOKING_DATA_ORIGINS,
   BOOKING_STATUSES,
+  LODGES,
   type BackupSnapshot,
   type Booking,
   type BookingDataOrigin,
   type BookingFilters,
   type BookingInput,
+  type Lodge,
 } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
+
+export type ImportMergeSkipDetail = {
+  id: string;
+  guestName: string;
+  reason: string;
+};
 
 type BookingState = {
   bookings: Booking[];
@@ -36,12 +44,16 @@ type BookingState = {
   addBooking: (payload: BookingInput) => Booking;
   updateBooking: (id: string, payload: BookingInput) => Booking;
   deleteBooking: (id: string) => void;
-  importBookingsMerge: (incoming: Booking[]) => { merged: number; skipped: number };
+  importBookingsMerge: (incoming: Booking[]) => {
+    merged: number;
+    skipped: number;
+    skipDetails: ImportMergeSkipDetail[];
+  };
   exportBookings: () => Booking[];
   forceSyncToCloud: () => Promise<void>;
   syncLocalToCloud: () => Promise<{ merged: number; updated: number; total: number }>;
-  toast: { message: string; type: "success" | "error" } | null;
-  showToast: (message: string, type?: "success" | "error") => void;
+  toast: { message: string; type: "success" | "error"; durationMs?: number } | null;
+  showToast: (message: string, type?: "success" | "error", durationMs?: number) => void;
   clearToast: () => void;
 };
 
@@ -139,12 +151,34 @@ function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Bookin
   })) as Booking[];
 }
 
+/** Header per POST /api/bookings dal browser (token pubblico, stesso valore di CRON_SECRET/API_WRITE_SECRET su Vercel). */
+function internalPostBookingsHeaders(): HeadersInit {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+  if (typeof token === "string" && token.length > 0) {
+    headers["X-Internal-Token"] = token;
+  }
+  return headers;
+}
+
+function readBackupSnapshotsFromLocal(): BackupSnapshot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(BACKUP_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as BackupSnapshot[];
+  } catch (backupErr) {
+    console.warn("[store/persist] Backup non leggibile, verrà sovrascritto:", backupErr);
+    return [];
+  }
+}
+
 function bookingUpdatedMs(b: Booking): number {
   const t = Date.parse(b.updatedAt);
   return Number.isFinite(t) ? t : 0;
 }
 
-/** KV + locale: stesso id → vince `updatedAt` più recente; i record solo locali NON rientrano quando il server è disponibile. */
+/** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano nel merge (P0 integrità). */
 function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[] {
   const map = new Map<string, Booking>();
   for (const b of serverRows) {
@@ -152,7 +186,10 @@ function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[
   }
   for (const b of localRows) {
     const s = map.get(b.id);
-    if (!s) continue;
+    if (!s) {
+      map.set(b.id, b);
+      continue;
+    }
     if (bookingUpdatedMs(b) > bookingUpdatedMs(s)) {
       map.set(b.id, b);
     }
@@ -206,8 +243,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
   function pushBackupSnapshot(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem(BACKUP_KEY);
-      const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
+      const current = readBackupSnapshotsFromLocal();
       const merged = [{ createdAt: new Date().toISOString(), bookings: [...bookings] }, ...current].slice(0, 10);
       window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
     } catch {
@@ -224,21 +260,32 @@ export const useBookingStore = create<BookingState>((set, get) => {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
         fetch("/api/bookings", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: internalPostBookingsHeaders(),
           body: JSON.stringify({ bookings }),
         })
           .then(async (r) => {
-            if (r.ok) {
-              const res = (await r.json()) as { ok: boolean; v?: number };
-              if (typeof res.v === "number") {
-                set({ serverVersion: res.v, syncError: false });
-                persistSettings({ serverVersion: res.v });
+            if (!r.ok) {
+              set({ syncError: true });
+              return;
+            }
+            try {
+              const res = (await r.json()) as { ok?: boolean; v?: number };
+              if (res.ok === false) {
+                set({ syncError: true });
+                return;
               }
+              if (typeof res.v === "number") {
+                set({ syncError: false, serverVersion: res.v });
+                persistSettings({ serverVersion: res.v });
+              } else {
+                set({ syncError: false });
+              }
+            } catch {
+              set({ syncError: true });
             }
           })
           .catch(() => set({ syncError: true }));
-        const raw = window.localStorage.getItem(BACKUP_KEY);
-        const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
+        const current = readBackupSnapshotsFromLocal();
         const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
         window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
       };
@@ -306,9 +353,31 @@ export const useBookingStore = create<BookingState>((set, get) => {
           if (cur.length > 0) {
             fetch("/api/bookings", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: internalPostBookingsHeaders(),
               body: JSON.stringify({ bookings: cur }),
-            }).catch(() => {});
+            })
+              .then(async (postRes) => {
+                if (!postRes.ok) {
+                  set({ syncError: true });
+                  return;
+                }
+                try {
+                  const body = (await postRes.json()) as { ok?: boolean; v?: number };
+                  if (body.ok === false) {
+                    set({ syncError: true });
+                    return;
+                  }
+                  if (typeof body.v === "number") {
+                    set({ syncError: false, serverVersion: body.v });
+                    persistSettings({ serverVersion: body.v });
+                  } else {
+                    set({ syncError: false });
+                  }
+                } catch {
+                  set({ syncError: true });
+                }
+              })
+              .catch(() => set({ syncError: true }));
           }
         }
       })
@@ -373,7 +442,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
     persistSettings({ monthTheme: value });
   },
   clearNewBookingsNotification: () => set({ hasNewBookings: false }),
-  showToast: (message, type = "success") => set({ toast: { message, type } }),
+  showToast: (message, type = "success", durationMs) =>
+    set({ toast: { message, type, ...(durationMs !== undefined ? { durationMs } : {}) } }),
   clearToast: () => set({ toast: null }),
   addBooking: (payload) => {
     validateBookingPayload(payload);
@@ -429,56 +499,93 @@ export const useBookingStore = create<BookingState>((set, get) => {
   importBookingsMerge: (incoming) => {
     pushBackupSnapshot(get().bookings);
 
-    const normalized = incoming
-      .filter((item) => item && item.id && item.guestName)
-      .map((item) => {
-        const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
-        const { channel, status } = channelAndStatusFromImport(item);
-        const updatedAt =
-          typeof item.updatedAt === "string" && item.updatedAt.trim()
-            ? item.updatedAt.trim()
-            : new Date().toISOString();
-        const dataOrigin: BookingDataOrigin = isBookingDataOrigin(item.dataOrigin)
-          ? item.dataOrigin
-          : "import_json";
-        return {
-          ...item,
-          channel,
-          status,
-          guestName: String(item.guestName),
-          notes: String(item.notes ?? ""),
-          guestsCount,
-          totalAmount: Number(
-            item.totalAmount ?? (item as { grossEarnings?: number }).grossEarnings ?? 0
-          ),
-          depositAmount: Number(item.depositAmount ?? 0),
-          depositReceived: Boolean(item.depositReceived),
-          createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt,
-          dataOrigin,
-        };
-      }) as Booking[];
+    const skipDetails: ImportMergeSkipDetail[] = [];
+    const pushSkip = (id: string, guestName: string, reason: string) => {
+      skipDetails.push({
+        id: id.length > 48 ? `${id.slice(0, 45)}…` : id,
+        guestName: guestName.length > 40 ? `${guestName.slice(0, 37)}…` : guestName,
+        reason,
+      });
+    };
+
+    const normalized: Booking[] = [];
+    for (let i = 0; i < incoming.length; i++) {
+      const raw = incoming[i] as unknown;
+      const rowLabel = `riga ${i + 1}`;
+      if (!raw || typeof raw !== "object") {
+        pushSkip("—", "—", `Record non valido (${rowLabel}).`);
+        continue;
+      }
+      const item = raw as Partial<Booking> & { source?: string; grossEarnings?: number };
+      const idRaw = item.id != null ? String(item.id).trim() : "";
+      if (!idRaw) {
+        pushSkip("—", String(item.guestName ?? "").trim() || "—", `Manca id (${rowLabel}).`);
+        continue;
+      }
+      const guestRaw = item.guestName != null ? String(item.guestName).trim() : "";
+      if (!guestRaw) {
+        pushSkip(idRaw, "—", `Manca nome ospite (${rowLabel}).`);
+        continue;
+      }
+
+      const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
+      const { channel, status } = channelAndStatusFromImport(item);
+      const updatedAt =
+        typeof item.updatedAt === "string" && item.updatedAt.trim()
+          ? item.updatedAt.trim()
+          : new Date().toISOString();
+      const dataOrigin: BookingDataOrigin = isBookingDataOrigin(item.dataOrigin)
+        ? item.dataOrigin
+        : "import_json";
+      normalized.push({
+        ...item,
+        id: idRaw,
+        channel,
+        status,
+        guestName: guestRaw,
+        notes: String(item.notes ?? ""),
+        guestsCount,
+        totalAmount: Number(item.totalAmount ?? item.grossEarnings ?? 0),
+        depositAmount: Number(item.depositAmount ?? 0),
+        depositReceived: Boolean(item.depositReceived),
+        createdAt: item.createdAt || new Date().toISOString(),
+        updatedAt,
+        dataOrigin,
+      } as Booking);
+    }
 
     const map = new Map<string, Booking>();
     get().bookings.forEach((booking) => map.set(booking.id, booking));
 
     let merged = 0;
-    let skipped = 0;
 
     normalized.forEach((candidate) => {
+      const guestLabel = candidate.guestName.trim() || "—";
       try {
         const existing = map.get(candidate.id);
         if (
           existing?.dataOrigin === "manual" &&
           bookingUpdatedMs(candidate) <= bookingUpdatedMs(existing)
         ) {
-          skipped += 1;
+          pushSkip(
+            candidate.id,
+            guestLabel,
+            "Board: prenotazione manuale con data aggiornamento uguale o più recente; import non applicato."
+          );
+          return;
+        }
+        if (!(LODGES as readonly string[]).includes(String(candidate.lodge))) {
+          pushSkip(
+            candidate.id,
+            guestLabel,
+            `Lodge non valida: "${String(candidate.lodge)}". Valori ammessi: ${LODGES.join(", ")}.`
+          );
           return;
         }
         const guestsCount = typeof candidate.guestsCount === "number" && candidate.guestsCount >= 1 ? candidate.guestsCount : 2;
         const payload: BookingInput = {
           guestName: candidate.guestName,
-          lodge: candidate.lodge,
+          lodge: candidate.lodge as Lodge,
           checkIn: candidate.checkIn,
           checkOut: candidate.checkOut,
           status: candidate.status,
@@ -500,15 +607,18 @@ export const useBookingStore = create<BookingState>((set, get) => {
         ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
         map.set(candidate.id, candidate);
         merged += 1;
-      } catch {
-        skipped += 1;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Errore sconosciuto.";
+        const reason = msg.includes("Sovrapposizione") ? msg : `Validazione / dati: ${msg}`;
+        pushSkip(candidate.id, guestLabel, reason);
       }
     });
 
     const next = Array.from(map.values()).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
     persist(next);
-    return { merged, skipped };
+    const skipped = skipDetails.length;
+    return { merged, skipped, skipDetails };
   },
   exportBookings: () => get().bookings,
   forceSyncToCloud: async () => {
@@ -521,7 +631,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     try {
       const mergeRes = await fetch("/api/bookings/merge-local", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: internalPostBookingsHeaders(),
         body: JSON.stringify({ bookings: cur }),
       });
       if (!mergeRes.ok) {
@@ -552,7 +662,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     try {
       const res = await fetch("/api/bookings/merge-local", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: internalPostBookingsHeaders(),
         body: JSON.stringify({ bookings: local }),
       });
       const data = (await res.json()) as {
