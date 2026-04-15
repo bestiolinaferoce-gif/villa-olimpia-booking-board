@@ -1,0 +1,287 @@
+/* Tema board: accento, chiaro/scuro, header meteo/orologio, alone animato — variabili su <html> */
+
+html[data-accent="blue"] {
+  --accent: #1d4ed8;
+  --accent-faint: color-mix(in srgb, var(--accent) 11%, transparent);
+  --today-bg: color-mix(in srgb, var(--accent) 7%, transparent);
+  --today-border: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+html[data-accent="petrol"] {
+  --accent: #0f766e;
+  --accent-faint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --today-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+  --today-border: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+html[data-accent="sand"] {
+  --accent: #b45309;
+  --accent-faint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --today-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+  --today-border: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+html[data-accent="turquoise"] {
+  --accent: #0e7490;
+  --accent-faint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --today-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+  --today-border: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+html[data-accent="plum"] {
+  --accent: #5b2c6f;
+  --accent-faint: color-mix(in srgb, var(--accent) 14%, transparent);
+  --today-bg: color-mix(in srgb, var(--accent) 9%, transparent);
+  --today-border: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #101820;
+  --panel: #1a2430;
+  --text: #e8eaed;
+  --muted: #94a3b8;
+  --line: #2d3b4c;
+  --zebra: rgba(255, 255, 255, 0.035);
+  --input-bg: #243044;
+  --toolbar-bg-start: #1a2430;
+  --toolbar-bg-end: #141c26;
+  --page-bg-mid: #121a24;
+  --page-bg-end: #0e141c;
+  --popover-surface: #1e2a38;
+  --summary-card-end: color-mix(in srgb, var(--accent) 18%, #1a2430);
+}
+
+html[data-theme="light"] {
+  --input-bg: #ffffff;
+  --toolbar-bg-start: #ffffff;
+  --toolbar-bg-end: #faf9f7;
+  --page-bg-mid: #ede9e2;
+  --page-bg-end: #ebe7e0;
+  --popover-surface: #ffffff;
+  --summary-card-end: var(--accent-faint);
+}
+
+/* Striscia header: orologio, meteo, tema */
+.toolbar-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding-top: 10px;
+  margin-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+}
+
+.board-clock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+
+.board-clock-time {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.board-clock-date {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.board-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--line));
+}
+
+.board-appearance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.board-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.board-theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-faint);
+}
+
+.board-accent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.board-accent-label-text {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .board-accent-label-text {
+    display: inline;
+  }
+}
+
+.board-accent-select {
+  min-width: 9.5rem;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--input-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.board-accent-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Alone animato leggero sulla home (page-root) */
+.page-root--ambient {
+  position: relative;
+  isolation: isolate;
+}
+
+.page-root--ambient::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 90% 55% at 50% -15%,
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    transparent 58%
+  );
+  opacity: 0.65;
+  animation: boardAmbientPulse 22s ease-in-out infinite alternate;
+}
+
+html[data-theme="dark"] .page-root--ambient::before {
+  opacity: 0.45;
+  background: radial-gradient(
+    ellipse 85% 50% at 50% -10%,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 55%
+  );
+}
+
+@keyframes boardAmbientPulse {
+  from {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.82;
+    transform: scale(1.02);
+  }
+}
+
+/* Superfici in tema scuro */
+html[data-theme="dark"] .toolbar {
+  background: linear-gradient(180deg, var(--toolbar-bg-start) 0%, var(--toolbar-bg-end) 100%);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .board-wrap {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background: var(--input-bg);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .ghost-btn,
+html[data-theme="dark"] .icon-btn {
+  background: var(--panel);
+  color: var(--text);
+}
+
+html[data-theme="dark"] .dialog-content {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .popover-content {
+  background: var(--popover-surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .export-format-item {
+  background: var(--panel);
+  color: var(--text);
+}
+
+html[data-theme="dark"] .summary-card {
+  background: linear-gradient(135deg, var(--panel) 0%, var(--summary-card-end) 100%);
+}
+
+html[data-theme="dark"] .auth-gate {
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 25%, transparent), var(--bg));
+}
+
+html[data-theme="dark"] .auth-card {
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="dark"] .auth-titles h1 {
+  color: var(--text);
+}
+
+html[data-theme="dark"] .auth-titles p {
+  color: var(--muted);
+}
+
+/* Gantt: weekend chiaro → versione scura leggibile */
+html[data-theme="dark"] .gantt-cell-weekend {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+html[data-theme="dark"] .gantt-weekend-header {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}

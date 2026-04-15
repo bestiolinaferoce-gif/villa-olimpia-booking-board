@@ -18,6 +18,7 @@ import {
 import { useState } from "react";
 import { format } from "date-fns";
 import type { BookingExportFormat } from "@/lib/bookingExportFormats";
+import { BoardHeaderExtras } from "@/components/BoardHeaderExtras";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
 import { SummaryBar } from "@/components/SummaryBar";
@@ -118,6 +119,8 @@ export function Toolbar({
           ) : null}
         </div>
       </div>
+
+      <BoardHeaderExtras monthTheme={monthTheme} />
 
       <div className="controls-row">
         <MonthNavigation
