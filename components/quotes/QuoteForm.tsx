@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Euro,
   Home,
+  Image as ImageIcon,
   Moon,
   Palette,
   PawPrint,
@@ -232,6 +233,20 @@ export function QuoteForm({
           Presenza animale domestico (cane/gatto) — + € 50
         </span>
       </label>
+
+      <div className="quotes-field">
+        <label htmlFor="q-photo">
+          <ImageIcon size={14} style={ic} /> Foto lodge (URL, opzionale)
+        </label>
+        <input
+          id="q-photo"
+          type="url"
+          placeholder="https://… (Cloudinary, Drive, Dropbox…)"
+          value={state.photoUrl ?? ""}
+          onChange={(e) => onChange({ photoUrl: e.target.value || undefined })}
+        />
+        <p className="quotes-hint">Apparirà come immagine di apertura nel preventivo.</p>
+      </div>
 
       <div className="quotes-summary">
         <div className="quotes-summary-row">

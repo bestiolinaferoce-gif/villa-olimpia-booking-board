@@ -57,6 +57,7 @@ export function QuotesPage() {
   const [quoteNumber] = useState(
     () => `PREV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
   );
+  const issuedAt = useMemo(() => new Date().toISOString(), []);
 
   const computed = useMemo(() => computeQuote(state), [state]);
   const lodge =
@@ -119,6 +120,7 @@ export function QuotesPage() {
           <QuoteTemplate
             ref={templateRef}
             quoteNumber={quoteNumber}
+            issuedAt={issuedAt}
             clientName={state.clientName}
             checkIn={state.checkIn}
             checkOut={state.checkOut}
@@ -130,6 +132,7 @@ export function QuotesPage() {
             compareLodge={compareLodge}
             includeSanitization={state.includeSanitization}
             computed={computed}
+            photoUrl={state.photoUrl}
           />
         </div>
       </div>

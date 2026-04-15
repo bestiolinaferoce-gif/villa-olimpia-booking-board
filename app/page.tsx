@@ -25,6 +25,7 @@ import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
 import { reconcileBookings } from "@/lib/reconciliation";
+import { ACCENT_HEX_MAP, isBoardAccentId, STORAGE_ACCENT_KEY } from "@/lib/boardUiPreferences";
 
 function formatImportMergeToast(
   merged: number,
@@ -288,11 +289,20 @@ export default function Home() {
       10: "#475569",
       11: "#1d4ed8",
     };
-    const accent = monthTheme ? (MONTH_ACCENTS[getMonth(monthDate)] ?? "#1d4ed8") : "#1d4ed8";
+    let accent: string;
+    if (monthTheme) {
+      accent = MONTH_ACCENTS[getMonth(monthDate)] ?? "#1d4ed8";
+    } else {
+      // Use the operator-selected fixed accent (read from localStorage, fall back to blue)
+      const saved = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_ACCENT_KEY) : null;
+      const accentId = saved && isBoardAccentId(saved) ? saved : "blue";
+      accent = ACCENT_HEX_MAP[accentId] ?? "#1d4ed8";
+    }
     const r = parseInt(accent.slice(1, 3), 16);
     const g = parseInt(accent.slice(3, 5), 16);
     const b = parseInt(accent.slice(5, 7), 16);
     document.documentElement.style.setProperty("--accent", accent);
+    document.documentElement.style.setProperty("--accent-faint", `rgba(${r}, ${g}, ${b}, 0.07)`);
     document.documentElement.style.setProperty("--today-bg", `rgba(${r}, ${g}, ${b}, 0.04)`);
     document.documentElement.style.setProperty("--today-border", `rgba(${r}, ${g}, ${b}, 0.2)`);
   }, [monthDate, monthTheme]);

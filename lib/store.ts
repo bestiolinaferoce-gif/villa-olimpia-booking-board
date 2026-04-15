@@ -356,7 +356,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
     if (raw) {
       try {
         const cached = JSON.parse(raw) as Array<Booking & { guestsCount?: number }>;
-        set({ bookings: migrateBookings(cached) });
+        const migrated = migrateBookings(cached);
+        // Strip tombstoned IDs from localStorage cache so ghosts don't enter the store
+        const cleaned = storedDeletedIds.size > 0 ? migrated.filter((b) => !storedDeletedIds.has(b.id)) : migrated;
+        set({ bookings: cleaned });
       } catch { /* ignore */ }
     }
     fetch("/api/bookings", { cache: "no-store" })
@@ -483,7 +486,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
   clearToast: () => set({ toast: null }),
   addBooking: (payload) => {
     validateBookingPayload(payload);
-    const bookings = get().bookings;
+    const deletedIds = get().deletedIds;
+    const bookings = deletedIds.size > 0
+      ? get().bookings.filter((b) => !deletedIds.has(b.id))
+      : get().bookings;
     ensureNoOverlap(bookings, payload);
     const now = new Date().toISOString();
     const booking: Booking = {

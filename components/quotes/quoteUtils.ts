@@ -16,6 +16,8 @@ export type QuoteFormState = {
   discountPercent: 0 | 5 | 10;
   includeSanitization: boolean;
   includePetDomestic: boolean;
+  /** URL foto proprietà/lodge da mostrare nel preventivo (opzionale). */
+  photoUrl?: string;
 };
 
 export type QuoteComputed = {
