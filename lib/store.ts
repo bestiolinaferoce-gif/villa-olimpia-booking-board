@@ -13,7 +13,7 @@ import {
   type BookingInput,
   type Lodge,
 } from "@/lib/types";
-import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
+import { BACKUP_KEY, DELETED_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 import { reconcileBookings } from "@/lib/reconciliation";
 
 export type ImportMergeSkipDetail = {
@@ -30,6 +30,7 @@ type BookingState = {
   serverVersion: number;
   syncError: boolean;
   hasNewBookings: boolean;
+  deletedIds: Set<string>;
   load: () => void;
   startPolling: () => () => void;
   stopPolling: () => void;
@@ -190,10 +191,12 @@ function bookingUpdatedMs(b: Booking): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-/** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano nel merge (P0 integrità). */
-function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[] {
+/** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano nel merge (P0 integrità).
+ *  `deletedIds`: IDs deleted locally — stripped from serverRows so they cannot be resurrected by poll/merge. */
+function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[], deletedIds?: Set<string>): Booking[] {
   const map = new Map<string, Booking>();
-  for (const b of serverRows) {
+  const rows = deletedIds && deletedIds.size > 0 ? serverRows.filter((b) => !deletedIds.has(b.id)) : serverRows;
+  for (const b of rows) {
     map.set(b.id, b);
   }
   for (const b of localRows) {
@@ -207,6 +210,22 @@ function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[]): Booking[
     }
   }
   return Array.from(map.values()).sort((a, c) => a.checkIn.localeCompare(c.checkIn));
+}
+
+function readDeletedIdsFromLocal(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(DELETED_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistDeletedIds(ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DELETED_KEY, JSON.stringify(Array.from(ids)));
 }
 
 function mergeEnrichedLocal(merged: Booking[], serverRows: Booking[]): boolean {
@@ -320,6 +339,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
   serverVersion: 0,
   syncError: false,
   hasNewBookings: false,
+  deletedIds: new Set<string>(),
   load: () => {
     if (typeof window === "undefined") return;
     const rawSettings = window.localStorage.getItem(SETTINGS_KEY);
@@ -330,6 +350,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
         if (typeof s.serverVersion === "number") set({ serverVersion: s.serverVersion });
       } catch { /* ignore */ }
     }
+    const storedDeletedIds = readDeletedIdsFromLocal();
+    if (storedDeletedIds.size > 0) set({ deletedIds: storedDeletedIds });
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
@@ -352,7 +374,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
           }
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
           const localRows = get().bookings;
-          const combined = mergeKvWithLocal(migrated, localRows);
+          const combined = mergeKvWithLocal(migrated, localRows, get().deletedIds);
           const nextVersion = (payload as { v?: number }).v ?? 0;
           set({ bookings: combined, serverVersion: nextVersion, syncError: false });
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
@@ -416,7 +438,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
           const data = Array.isArray(payload) ? payload : (payload.data ?? []);
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
           const localRows = get().bookings;
-          const combined = mergeKvWithLocal(migrated, localRows);
+          const combined = mergeKvWithLocal(migrated, localRows, get().deletedIds);
           set({ bookings: combined, serverVersion: newV, syncError: false, hasNewBookings: true });
           if (typeof window !== "undefined") {
             window.localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
@@ -510,7 +532,9 @@ export const useBookingStore = create<BookingState>((set, get) => {
   },
   deleteBooking: (id) => {
     const next = get().bookings.filter((booking) => booking.id !== id);
-    set({ bookings: next });
+    const newDeletedIds = new Set([...get().deletedIds, id]);
+    set({ bookings: next, deletedIds: newDeletedIds });
+    persistDeletedIds(newDeletedIds);
     persist(next);
   },
   importBookingsMerge: (incoming) => {

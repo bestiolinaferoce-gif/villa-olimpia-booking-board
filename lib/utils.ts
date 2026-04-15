@@ -15,6 +15,7 @@ import type { Booking, BookingFilters } from "@/lib/types";
 export const STORAGE_KEY = "villa-olimpia-booking-board:v1";
 export const BACKUP_KEY = "villa-olimpia-booking-board:backups:v1";
 export const SETTINGS_KEY = "villa-olimpia-booking-board:settings:v1";
+export const DELETED_KEY = "villa-olimpia-booking-board:deleted:v1";
 
 export const statusColors: Record<Booking["status"], string> = {
   confirmed: "#16a34a",
