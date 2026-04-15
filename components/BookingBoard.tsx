@@ -81,8 +81,18 @@ export function BookingBoard({ monthDays, bookings, filters, onCreate, onEdit }:
                         const sBadge = statusBadge[booking.status] ?? statusBadge.confirmed;
                         const cBadge = channelBadge[booking.channel] ?? channelBadge.other;
                         return (
-                          <div className="booking-chip" data-status={booking.status} title={bookingTooltip(booking)} style={{ borderLeftColor: statusColors[booking.status] ?? statusColors.confirmed }}>
-                            <strong>{booking.guestName} · {booking.guestsCount}p</strong>
+                          <div className="booking-chip" data-status={booking.status} data-origin={booking.dataOrigin} title={bookingTooltip(booking)} style={{ borderLeftColor: statusColors[booking.status] ?? statusColors.confirmed }}>
+                            <strong>
+                              {booking.guestName} · {booking.guestsCount}p
+                              {booking.dataOrigin === "sync" && booking.totalAmount === 0 && (
+                                <span
+                                  title="Importata da Airbnb — completare: ospiti, importo, caparra"
+                                  style={{ marginLeft: 4, fontSize: "0.7em", opacity: 0.7, fontWeight: "normal", letterSpacing: 0 }}
+                                >
+                                  ⟳
+                                </span>
+                              )}
+                            </strong>
                             <div className="chip-badges">
                               <span className="badge" style={{ background: sBadge.bg, color: sBadge.text, borderColor: sBadge.border }}>
                                 {statusLabels[booking.status] ?? booking.status}

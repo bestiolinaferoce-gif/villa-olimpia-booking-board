@@ -76,6 +76,12 @@ async function syncProperty(
   const updated = [...existing];
   const now = new Date().toISOString();
 
+  // Fields that sync must NEVER overwrite once an operator has set them manually:
+  // notes, guestsCount, totalAmount, depositAmount, depositReceived,
+  // guestProfile, extrasAmount, cleaningFee, touristTax, economicNotes, childrenCount.
+  // guestName is overwritten only if it is still the Airbnb placeholder (operator has not corrected it).
+  const AIRBNB_PLACEHOLDER_NAME = "Ospite Airbnb";
+
   for (const event of events) {
     const id  = airbnbBookingId(event.confirmationCode);
     const idx = updated.findIndex((b) => b.id === id);
@@ -85,14 +91,17 @@ async function syncProperty(
       result.created++;
     } else {
       const b = updated[idx];
-      const dataChanged = b.checkIn !== event.dtstart || b.checkOut !== event.dtend || b.guestName !== event.guestName;
+      // Only update guestName from feed if operator has not corrected it yet.
+      const canUpdateGuestName = b.guestName === AIRBNB_PLACEHOLDER_NAME || b.guestName === event.guestName;
+      const datesChanged = b.checkIn !== event.dtstart || b.checkOut !== event.dtend;
+      const nameChanged  = canUpdateGuestName && b.guestName !== event.guestName;
       const wasReactivated = b.status === "cancelled";
-      if (dataChanged || wasReactivated) {
+      if (datesChanged || nameChanged || wasReactivated) {
         updated[idx] = {
-          ...b,
+          ...b,                        // preserves all manual fields
           checkIn: event.dtstart,
           checkOut: event.dtend,
-          guestName: event.guestName,
+          ...(canUpdateGuestName ? { guestName: event.guestName } : {}),
           status: "confirmed",
           isNew: false,
           updatedAt: now,
@@ -161,5 +170,17 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), totalChanges, results });
+  const summary = results
+    .map((r) => {
+      if (r.error) return `${r.lodge}: ERROR(${r.error})`;
+      const parts: string[] = [];
+      if (r.created)   parts.push(`+${r.created} creati`);
+      if (r.updated)   parts.push(`~${r.updated} aggiornati`);
+      if (r.cancelled) parts.push(`✗${r.cancelled} cancellati`);
+      if (r.skipped)   parts.push(`=${r.skipped} invariati`);
+      return `${r.lodge}: ${parts.length ? parts.join(", ") : "nessuna modifica"}`;
+    })
+    .join(" | ");
+
+  return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), totalChanges, summary, results });
 }
