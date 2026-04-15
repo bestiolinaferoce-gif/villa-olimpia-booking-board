@@ -7,7 +7,14 @@ export function isBookingsApiProductionLike(): boolean {
 }
 
 export function getBookingApiWriteSecret(): string {
-  return (process.env.API_WRITE_SECRET ?? process.env.CRON_SECRET ?? "").trim();
+  // Client always sends NEXT_PUBLIC_API_WRITE_SECRET; server must validate against
+  // the same value. Fall back to API_WRITE_SECRET then CRON_SECRET for compat.
+  return (
+    process.env.NEXT_PUBLIC_API_WRITE_SECRET ??
+    process.env.API_WRITE_SECRET ??
+    process.env.CRON_SECRET ??
+    ""
+  ).trim();
 }
 
 /**
