@@ -128,6 +128,17 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
     if (excludeId && booking.id === excludeId) {
       return false;
     }
+    // Same Airbnb sync reservation with a different id (e.g. id format changed
+    // between imports): lodge + exact dates + both dataOrigin="sync" → same booking.
+    if (
+      booking.dataOrigin === "sync" &&
+      payload.dataOrigin === "sync" &&
+      booking.lodge === payload.lodge &&
+      booking.checkIn === payload.checkIn &&
+      booking.checkOut === payload.checkOut
+    ) {
+      return false;
+    }
     if (booking.lodge !== payload.lodge) {
       return false;
     }
@@ -414,7 +425,9 @@ export const useBookingStore = create<BookingState>((set, get) => {
             persist(combined);
           }
         }
-      } catch { /* silent — non aggiornare syncError da polling */ }
+      } catch {
+        set({ syncError: true });
+      }
       if (active) setTimeout(poll, INTERVAL);
     };
     const firstTimer = setTimeout(poll, 5_000);
