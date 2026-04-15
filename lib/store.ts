@@ -14,6 +14,7 @@ import {
   type Lodge,
 } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
+import { reconcileBookings } from "@/lib/reconciliation";
 
 export type ImportMergeSkipDetail = {
   id: string;
@@ -487,7 +488,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
     if (!current) {
       throw new Error("Prenotazione non trovata.");
     }
-    ensureNoOverlap(bookings, payload, id);
+    // Use the reconciled (deduplicated) list so hidden duplicates in the raw
+    // store do not trigger a false overlap error when editing the visible booking.
+    const { bookings: canonical } = reconcileBookings(bookings);
+    ensureNoOverlap(canonical, payload, id);
     const updated: Booking = {
       ...current,
       ...payload,
