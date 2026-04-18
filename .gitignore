@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data files — never commit booking data
+data/bookings.json
+data/bookings-canonical.json

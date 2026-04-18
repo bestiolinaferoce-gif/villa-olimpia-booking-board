@@ -58,8 +58,8 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[public-availability] KV read error:", err)
     return NextResponse.json(
-      { lodge, ranges: [], lastSyncedAt: null, source: "booking-board" },
-      { status: 200 }
+      { lodge, error: "availability_unavailable", ranges: null, lastSyncedAt: null, source: "booking-board" },
+      { status: 503 }
     )
   }
 }
