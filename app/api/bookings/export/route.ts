@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { Booking } from "@/lib/types";
 
 /**
@@ -33,7 +33,15 @@ function nightsBetween(checkIn: string, checkOut: string): number {
   return Math.max(0, Math.round((b - a) / (1000 * 60 * 60 * 24)));
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const apiSecret = process.env.CRON_SECRET ?? "";
+  const clientToken =
+    req.headers.get("x-internal-token") ?? req.nextUrl.searchParams.get("token") ?? "";
+
+  if (apiSecret && clientToken !== apiSecret) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const exportedAt = new Date().toISOString();
   try {
     const payload = await readKV();

@@ -190,6 +190,11 @@ export const quoteDocument = {
     "Effettuare il bonifico dell’acconto (30%) e inviare la ricevuta.",
     "Ricevere conferma scritta di prenotazione; saldo (70%) al check-in come da condizioni.",
   ] as const,
+  /** Copertina: messaggio breve prima del dettaglio pagine successive */
+  coverIntro:
+    "Ci pregiamo di presentarVi questa proposta di soggiorno presso Villa Olimpia, redatta con cura su misura per il periodo e la soluzione lodge indicate.",
+  englishNote:
+    "Su richiesta via email è disponibile una sintesi in inglese della presente proposta.",
 } as const;
 
 /** Lodge: descrizioni + metadati strutturali solo se indicati dal gestore (no supposizioni). */
@@ -256,91 +261,187 @@ export const quoteLodges = [
 export type QuoteLodgeId = (typeof quoteLodges)[number]["id"];
 export type QuoteLodge = (typeof quoteLodges)[number];
 
-/** Dettaglio descrittivo per sezione lodge / confronto (oltre a shortDescription). */
-export const lodgeQuoteExtras: Partial<
-  Record<
-    QuoteLodgeId,
-    {
-      compositionNote: string;
-      strengths: readonly string[];
-      equipment: readonly string[];
-    }
-  >
-> = {
+/**
+ * Profilo preventivo per lodge: testi specifici (non generici ripetuti).
+ * Composizione e dotazioni allineate a nome lodge / metadati noti (maxGuests, bedrooms, shortDescription).
+ */
+export type LodgeQuoteProfile = {
+  /** Sottotitolo hero (1 riga, specifico) */
+  premiumLead: string;
+  /** Composizione interna descritta in modo concreto */
+  compositionDetail: string;
+  /** Spazio esterno dedicato, se applicabile; null se non dichiarato */
+  outdoorNote: string | null;
+  /** Punti distintivi della soluzione */
+  distinctive: readonly string[];
+  /** Dotazioni principali */
+  amenities: readonly string[];
+};
+
+const LODGE_QUOTE_PROFILES = {
   Frangipane: {
-    compositionNote:
-      "Fino a 6 posti letto. Ambiente luminoso e spazioso, adatto a famiglie numerose o gruppi che cercano comfort.",
-    strengths: [
-      "Elevata capienza",
-      "Ambienti luminosi",
-      "Adatta a soggiorni di media e lunga durata",
+    premiumLead: "Lodge ampia e luminosa — la più capiente della villa, ideale per famiglie numerose.",
+    compositionDetail:
+      "Fino a 6 posti letto. Disposizione su più ambienti: zona giorno spaziosa, cucina attrezzata e camere da letto luminose. Layout pensato per gruppi che vogliono condividere gli spazi senza rinunciare al comfort.",
+    outdoorNote:
+      "Spazio esterno riservato alla lodge per relax all’aperto (dettagli su arredo esterno confermati in struttura).",
+    distinctive: [
+      "Massima capienza tra le lodge (6 ospiti)",
+      "Ambienti luminosi e distribuzione su più stanze",
+      "Adatta a soggiorni di una settimana o più",
     ],
-    equipment: [
-      "Cucina attrezzata",
+    amenities: [
+      "Cucina completa attrezzata",
       "Climatizzazione",
-      "Dotazioni bagno e camere secondo planimetria in struttura",
+      "Bagni e camere secondo planimetria in struttura",
     ],
   },
   Giglio: {
-    compositionNote:
-      "Fino a 5 posti letto. Soluzione equilibrata tra spazio e gestione pratica del soggiorno.",
-    strengths: [
-      "Bilanciamento spazio / comfort",
-      "Adatta a famiglie e piccoli gruppi",
-      "Soggiorno tranquillo in contesto villa",
+    premiumLead: "Tra le lodge più richieste: bilanciamento perfetto tra spazio notte, cucina e vita all’aperto.",
+    compositionDetail:
+      "Fino a 5 posti letto. Due camere da letto (camera matrimoniale e camera con letto alla francese / una piazza e mezza), zona living, cucina ampia con spazio per la preparazione dei pasti e zona pranzo interna.",
+    outdoorNote:
+      "Spazio esterno con gazebo: ideale per colazioni e cene all’aperto nella stagione adatta.",
+    distinctive: [
+      "Doppia camera da letto con distribuzione chiara per famiglie",
+      "Cucina generosa rispetto alla media lodge",
+      "Gazebo per uso esterno dedicato",
     ],
-    equipment: [
-      "Cucina attrezzata",
+    amenities: [
+      "Cucina attrezzata con zona cottura e ripiani ampi",
       "Climatizzazione",
-      "Disposizione interna confermata al check-in",
+      "Zona living separata dalla zona notte",
     ],
   },
   Orchidea: {
-    compositionNote:
-      "Dotazione con 2 bagni; spazi armoniosi per un soggiorno comodo in villa.",
-    strengths: [
-      "Due bagni",
-      "Spazi curati",
-      "Adatta a nuclei che privilegiano praticità",
+    premiumLead: "Layout compatto con doppio servizio: una camera e due bagni completi.",
+    compositionDetail:
+      "Composizione con una camera da letto, due bagni completi, cucina attrezzata e zona giorno. Soluzione pensata per chi privilegia praticità mattutina e comfort in bagno per più ospiti.",
+    outdoorNote: null,
+    distinctive: [
+      "Due bagni completi con una sola camera da letto",
+      "Ottima per coppie che ospitano occasionalmente altri ospiti",
+      "Spazi armoniosi e curati in contesto villa",
     ],
-    equipment: [
+    amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Secondo bagno per maggiore comodità",
+      "Secondo bagno con doccia / servizi secondo scheda struttura",
     ],
   },
   Geranio: {
-    compositionNote:
-      "Due camere da letto e due bagni; organizzazione interna adatta a famiglie.",
-    strengths: [
-      "Layout con 2 camere e 2 bagni",
-      "Praticità per famiglie",
-      "Ambiente riservato in villa",
+    premiumLead: "Due camere e due bagni: organizzazione familiare senza compromessi.",
+    compositionDetail:
+      "Due camere da letto e due bagni, cucina attrezzata e zona giorno. Distribuzione classica per famiglie con bambini o due coppie che viaggiano insieme.",
+    outdoorNote: null,
+    distinctive: [
+      "Simmetria 2 camere / 2 bagni",
+      "Praticità per soggiorni di media durata",
+      "Ambiente riservato all’interno della villa",
     ],
-    equipment: [
+    amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Camere e bagni secondo scheda struttura",
+      "Dotazioni camere e bagni secondo scheda lodge",
     ],
   },
-};
+  Gardenia: {
+    premiumLead: "Luce e aria: due balconi per godere del contesto verde della struttura.",
+    compositionDetail:
+      "Lodge con due balconi affacciati sugli spazi esterni della proprietà, cucina attrezzata, zona giorno e camere da letto curate. Pensata per chi ama alternare vita in lodge e momenti all’aperto sul proprio balcone.",
+    outdoorNote: "Due balconi privativi (esposizione e arredo secondo planimetria in struttura).",
+    distinctive: [
+      "Doppio balcone",
+      "Atmosfera luminosa",
+      "Vicinanza agli spazi comuni e al verde della villa",
+    ],
+    amenities: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Accesso esterno su due livelli balcone",
+    ],
+  },
+  Azalea: {
+    premiumLead: "Terrazza semipanoramica: carattere forte e vista aperta sul contesto.",
+    compositionDetail:
+      "Lodge con terrazza semipanoramica, cucina attrezzata, zona notte e giorno organizzata per soggiorni rilassanti. Posizione privilegiata rispetto agli spazi comuni e al verde.",
+    outdoorNote: "Terrazza semipanoramica attrezzata per relax all’aperto (dettagli in struttura).",
+    distinctive: [
+      "Terrazza con respiro panoramico",
+      "Eleganza dell’insieme architettonico",
+      "Adatta a coppie e piccoli nuclei",
+    ],
+    amenities: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Spazio esterno ampio sulla terrazza",
+    ],
+  },
+  Tulipano: {
+    premiumLead: "Lodge riservata, curata nei dettagli — perfetta per chi cerca tranquillità.",
+    compositionDetail:
+      "Ambiente riservato e curato; disposizione interna (camere, bagni, cucina) e dotazioni confermate al check-in secondo scheda struttura. Capienza e layout ottimali per nuclei contenuti.",
+    outdoorNote: null,
+    distinctive: [
+      "Atmosfera intima e ordinata",
+      "Ideale per soggiorni brevi o romantici",
+      "Gestione diretta Villa Olimpia",
+    ],
+    amenities: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Layout interno su conferma in struttura",
+    ],
+  },
+  Lavanda: {
+    premiumLead: "Tra il verde della villa: lodge dalla forte identità rilassante.",
+    compositionDetail:
+      "Posizionata in stretto contatto con gli spazi verdi del complesso; interni curati con cucina attrezzata e zona notte. Organizzazione precisa delle stanze comunicata in fase di prenotazione / check-in.",
+    outdoorNote: "Contesto verde immediato intorno alla lodge.",
+    distinctive: [
+      "Forte legame con giardino e natura circostante",
+      "Atmosfera distensiva",
+      "Adatta a chi ama quiete e outdoor",
+    ],
+    amenities: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Scheda dotazioni completa in struttura",
+    ],
+  },
+  Fiordaliso: {
+    premiumLead: "Accoglienza classica Villa Olimpia in una lodge dagli interni curati.",
+    compositionDetail:
+      "Lodge accogliente con ambienti ordinati; numero di camere, bagni e disposizione esatta secondo planimetria consegnata in struttura. Adatta a coppie e piccoli gruppi in base alla capienza indicata al momento della conferma.",
+    outdoorNote: null,
+    distinctive: [
+      "Interni curati e funzionali",
+      "Ottimo rapporto qualità / semplicità d’uso",
+      "Supporto gestione diretta durante il soggiorno",
+    ],
+    amenities: [
+      "Cucina attrezzata",
+      "Climatizzazione",
+      "Dotazioni conformi alla scheda lodge",
+    ],
+  },
+} as const satisfies Record<QuoteLodgeId, LodgeQuoteProfile>;
 
+export function getLodgeQuoteProfile(lodge: QuoteLodge): LodgeQuoteProfile {
+  return LODGE_QUOTE_PROFILES[lodge.id];
+}
+
+/** Per tabella confronto: stessi campi del profilo in forma tabellare */
 export function lodgeQuotePresentation(lodge: QuoteLodge): {
   composition: string;
   strengths: string[];
   equipment: string[];
 } {
-  const extras = lodgeQuoteExtras[lodge.id];
+  const p = getLodgeQuoteProfile(lodge);
   return {
-    composition: extras?.compositionNote ?? lodge.shortDescription,
-    strengths: extras?.strengths
-      ? [...extras.strengths]
-      : [lodge.shortDescription],
-    equipment: extras?.equipment
-      ? [...extras.equipment]
-      : [
-          "Dotazioni e disposizione interna confermate in struttura al momento del check-in.",
-        ],
+    composition: p.compositionDetail,
+    strengths: [...p.distinctive],
+    equipment: [...p.amenities],
   };
 }
 
@@ -368,12 +469,37 @@ export const villaIntro = {
 export const villaStructure = {
   pool: "Area piscina per relax e tempo libero (utilizzo secondo regolamento interno e stagionalità).",
   garden: "Giardino e spazi esterni curati per vivere l’aperto in sicurezza.",
+  /** Contesto verde struttura (cifra indicativa del complesso; verificare in struttura se necessario). */
+  gardenScale:
+    "Il complesso si sviluppa tra ampi spazi verdi (ordine di grandezza indicativo ~3.000 mq di giardino e aree esterne condivise e curate), ideali per relax tra una giornata al mare e il rientro in lodge.",
   beach:
-    "Vicinanza al litorale ionico e alle spiagge della zona, inclusa l’area di Spiaggia dei Gigli; tempi di percorrenza verso la spiaggia prescelta variabili in base alla destinazione.",
+    "Vicinanza al litorale ionico e alle spiagge della zona, con riferimento all’area di Spiaggia dei Gigli; tempi di percorrenza verso la spiaggia prescelta variabili in base alla destinazione.",
   territory:
-    "Territorio di Capo Rizzuto (KR): mare, natura e servizi locali raggiungibili in auto; suggerimenti su itinerari e spiagge su richiesta in fase di soggiorno.",
+    "Capo Rizzuto (KR): territorio tra mare Ionio, natura e borghi. In prossimità: Area Marina Protetta Capo Rizzuto, il borgo e il castello di Le Castella, itinerari verso spiagge e servizi locali.",
   sea: "Posizione favorevole verso il litorale ionico; tempi di percorrenza verso spiagge e punti di interesse variabili in base alla destinazione scelta.",
 } as const;
+
+/** Punti territorio con chiave icona (lucide) per il template */
+export const villaTerritoryPoints = [
+  {
+    key: "gigli",
+    icon: "waves" as const,
+    title: "Spiaggia dei Gigli",
+    text: "Riferimento balneare noto sulla costa ionica calabrese; distanze e tempi di percorrenza dipendono dal punto esatto prescelto.",
+  },
+  {
+    key: "amp",
+    icon: "anchor" as const,
+    title: "Area Marina Protetta",
+    text: "Patrimonio naturalistico e paesaggistico della costa di Capo Rizzuto, con possibilità di escursioni e attività legate al mare.",
+  },
+  {
+    key: "castella",
+    icon: "castle" as const,
+    title: "Le Castella",
+    text: "Borgo e arco storico sul mare, meta classica per una passeggiata serale o una giornata tra storia e panorami.",
+  },
+] as const;
 
 /** Servizi con icona: nessuna promessa tecnica non verificabile */
 export const villaAmenityLines = [

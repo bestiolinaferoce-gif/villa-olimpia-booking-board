@@ -871,6 +871,332 @@
   margin-top: 4px !important;
 }
 
+/* —— Multi-pagina (PDF / stampa): fogli logici —— */
+.qt-sheet {
+  page-break-after: always;
+  page-break-inside: avoid;
+  border-bottom: 2px dashed rgba(0, 0, 0, 0.12);
+  margin-bottom: 28px;
+  padding-bottom: 8px;
+}
+
+.qt-sheet--last,
+.qt-sheet:last-child {
+  page-break-after: auto;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.qt-sheet-running {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--qt-box-label, #4a5568);
+  border-bottom: 1px solid var(--qt-box-border, #d9e2ec);
+  padding-bottom: 8px;
+  margin-bottom: 18px;
+}
+
+.qt-body--sheet {
+  padding-top: 0;
+}
+
+.qt-header--cover {
+  align-items: start;
+}
+
+.qt-cover-body {
+  padding: 26px 32px 32px;
+  background: var(--qt-body-bg, #f8f6f0);
+}
+
+.qt-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.qt-cover-card {
+  background: var(--qt-box-bg, #f1f4f8);
+  border: 1px solid var(--qt-box-border, #d9e2ec);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.qt-cover-card--wide {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 520px) {
+  .qt-cover-card--wide {
+    grid-column: span 2;
+  }
+}
+
+.qt-cover-card-ic {
+  color: var(--qt-section-border, #c9a227);
+  opacity: 0.95;
+}
+
+.qt-cover-card-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--qt-box-label, #4a5568);
+}
+
+.qt-cover-card-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--qt-section-accent, #0a1628);
+  line-height: 1.3;
+}
+
+.qt-cover-intro-wrap {
+  border-left: 4px solid var(--qt-section-border, #c9a227);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  background: rgba(201, 162, 39, 0.06);
+  border-radius: 0 10px 10px 0;
+}
+
+.qt-cover-intro-lead {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--qt-section-accent, #0a1628);
+}
+
+.qt-cover-intro-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--qt-body-text, #2d3748);
+}
+
+.qt-cover-contacts {
+  font-size: 0.88rem;
+  color: var(--qt-body-text, #2d3748);
+}
+
+.qt-cover-contacts-label {
+  font-weight: 700;
+  margin-right: 8px;
+  color: var(--qt-section-accent, #0a1628);
+}
+
+.qt-cover-contacts a {
+  color: var(--qt-section-accent, #0a1628);
+}
+
+/* Territorio: tile con icone */
+.qt-territory-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 560px) {
+  .qt-territory-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.qt-territory-tile {
+  background: var(--qt-box-bg, #f1f4f8);
+  border: 1px solid var(--qt-box-border, #d9e2ec);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.qt-territory-tile-ic {
+  display: flex;
+  color: var(--qt-section-border, #c9a227);
+  margin-bottom: 6px;
+}
+
+.qt-territory-tile strong {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--qt-section-accent, #0a1628);
+  margin-bottom: 6px;
+}
+
+.qt-territory-tile p {
+  margin: 0;
+  color: var(--qt-body-text, #2d3748);
+}
+
+.qt-territory--lead {
+  margin-top: 14px !important;
+  font-weight: 600;
+}
+
+/* Pagina lodge */
+.qt-lodge-hero {
+  text-align: center;
+  padding: 24px 20px 20px;
+  margin-bottom: 20px;
+  border: 2px solid var(--qt-section-border, #c9a227);
+  border-radius: 14px;
+  background: linear-gradient(
+    165deg,
+    rgba(201, 162, 39, 0.1) 0%,
+    var(--qt-box-bg, #f1f4f8) 45%,
+    var(--qt-body-bg, #f8f6f0) 100%
+  );
+}
+
+.qt-lodge-hero-icon {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(10, 22, 40, 0.06);
+  color: var(--qt-section-accent, #0a1628);
+  margin-bottom: 10px;
+}
+
+.qt-lodge-hero-label {
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--qt-box-label, #4a5568);
+}
+
+.qt-lodge-hero-title {
+  margin: 0 0 10px;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--qt-section-accent, #0a1628);
+}
+
+.qt-lodge-hero-lead {
+  margin: 0 0 10px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--qt-section-accent, #0a1628);
+  line-height: 1.45;
+}
+
+.qt-lodge-hero-sub {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--qt-body-text, #2d3748);
+  line-height: 1.5;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.qt-lodge-facts--hero {
+  margin-top: 12px !important;
+  text-align: center;
+}
+
+.qt-lodge-cards {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+@media (min-width: 560px) {
+  .qt-lodge-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.qt-lodge-card {
+  background: var(--qt-box-bg, #f1f4f8);
+  border: 1px solid var(--qt-box-border, #d9e2ec);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--qt-body-text, #2d3748);
+}
+
+.qt-lodge-card-title {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--qt-section-accent, #0a1628);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qt-lodge-card p {
+  margin: 0;
+}
+
+.qt-bullet-list--check {
+  list-style: none;
+  padding-left: 0;
+}
+
+.qt-bullet-list--check li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.qt-li-ic {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--qt-section-border, #c9a227);
+}
+
+/* Economico in evidenza */
+.qt-econ--prominent {
+  border: 2px solid var(--qt-section-border, #c9a227);
+  border-radius: 12px;
+  padding: 4px 0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+}
+
+.qt-econ--prominent .qt-econ-total {
+  font-size: 1.2rem;
+}
+
+/* Banca in pagina riepilogo */
+.qt-bank--featured {
+  border-width: 3px;
+  border-color: var(--qt-bank-accent, #c9a227);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.qt-section--bank {
+  margin-top: 8px;
+}
+
+.qt-section--lang {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--qt-box-border, #d9e2ec);
+}
+
+.qt-section--lang .qt-subsection-title {
+  border-left: none;
+  padding-left: 0;
+}
+
 @media print {
   .quotes-page {
     background: #fff;
@@ -889,5 +1215,16 @@
   .quotes-template {
     box-shadow: none;
     max-width: 100%;
+  }
+
+  .qt-sheet {
+    page-break-after: always;
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .qt-sheet--last {
+    page-break-after: auto;
   }
 }
