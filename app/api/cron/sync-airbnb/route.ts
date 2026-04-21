@@ -6,6 +6,7 @@ import {
   airbnbBookingId,
   type AirbnbSyncConfig,
 } from "@/lib/airbnb-ical";
+import { getBookingApiWriteSecret } from "@/lib/bookingsApiAuth";
 
 const BASE  = process.env.KV_REST_API_URL   ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
@@ -157,19 +158,6 @@ export async function GET(req: NextRequest) {
 
   const totalChanges = results.reduce((s, r) => s + r.created + r.updated + r.cancelled, 0);
 
-  if (totalChanges > 0) {
-    const url = new URL("/api/bookings", req.url).toString();
-    const writeToken = process.env.API_WRITE_SECRET ?? process.env.CRON_SECRET ?? "";
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(writeToken ? { "x-internal-token": writeToken } : {}),
-      },
-      body: JSON.stringify(bookings),
-    });
-  }
-
   const summary = results
     .map((r) => {
       if (r.error) return `${r.lodge}: ERROR(${r.error})`;
@@ -181,6 +169,41 @@ export async function GET(req: NextRequest) {
       return `${r.lodge}: ${parts.length ? parts.join(", ") : "nessuna modifica"}`;
     })
     .join(" | ");
+
+  if (totalChanges > 0) {
+    const url = new URL("/api/bookings", req.url).toString();
+    const writeToken = getBookingApiWriteSecret();
+    const writeRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(writeToken ? { "x-internal-token": writeToken } : {}),
+      },
+      body: JSON.stringify(bookings),
+    });
+
+    if (!writeRes.ok) {
+      let writeResponse: unknown;
+      try {
+        writeResponse = await writeRes.json();
+      } catch {
+        writeResponse = await writeRes.text().catch(() => "(unreadable)");
+      }
+      return NextResponse.json(
+        {
+          ok: false,
+          syncedAt: new Date().toISOString(),
+          totalChanges,
+          summary,
+          results,
+          write_failed: true,
+          write_status: writeRes.status,
+          write_response: writeResponse,
+        },
+        { status: 502 }
+      );
+    }
+  }
 
   return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), totalChanges, summary, results });
 }

@@ -285,3 +285,38 @@ html[data-theme="dark"] .gantt-weekend-header {
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
 }
+
+/* Dialog: override dark mancanti */
+html[data-theme="dark"] .danger-btn {
+  background: var(--panel);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+html[data-theme="dark"] .cell-btn {
+  background: transparent;
+  color: var(--muted);
+}
+
+html[data-theme="dark"] .error-box {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #fca5a5;
+}
+
+html[data-theme="dark"] .field-error {
+  color: #fca5a5;
+}
+
+html[data-theme="dark"] .section-toggle {
+  border-top-color: var(--line);
+  color: var(--muted);
+}
+
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  outline-offset: 1px;
+}
