@@ -96,21 +96,38 @@ export function QuotesPage() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{
           ranges: OccupiedRange[] | null;
+          lastSyncedAt: string | null;
           error?: string;
         }>;
       })
       .then((data) => {
         if (cancelled) return;
+
+        // ranges: null → API returned 503 / KV hard error
         if (!data.ranges) {
-          // 503 with ranges: null means KV unavailable — don't block but warn
           setAvailabilityStatus("error");
           return;
         }
-        setAvailabilityStatus(
-          isOccupied(data.ranges, state.checkIn, state.checkOut)
-            ? "unavailable"
-            : "available"
-        );
+
+        // ranges non-empty → data definitely came from KV storage; check collision
+        if (data.ranges.length > 0) {
+          setAvailabilityStatus(
+            isOccupied(data.ranges, state.checkIn, state.checkOut)
+              ? "unavailable"
+              : "available"
+          );
+          return;
+        }
+
+        // ranges: [] — two distinct cases:
+        // 1. KV confirmed empty with a sync timestamp → genuinely available
+        // 2. lastSyncedAt: null → KV not configured OR legacy format without ts
+        //    → cannot conclude availability; treat as unknown to prevent false positive
+        if (data.lastSyncedAt) {
+          setAvailabilityStatus("available");
+        } else {
+          setAvailabilityStatus("unknown");
+        }
       })
       .catch(() => {
         if (!cancelled) setAvailabilityStatus("error");
@@ -153,8 +170,12 @@ export function QuotesPage() {
     exportHints.push("le date selezionate non sono disponibili per questa lodge");
   if (availabilityStatus === "loading")
     exportHints.push("verifica disponibilità in corso — attendere");
+  if (availabilityStatus === "unknown")
+    exportHints.push(
+      "verifica disponibilità non conclusiva — la sorgente dati non conferma con certezza. Contattare il gestore per conferma manuale prima di inviare il preventivo"
+    );
   if (availabilityStatus === "error")
-    exportHints.push("verifica disponibilità non riuscita — riprovare o cambiare date");
+    exportHints.push("errore verifica disponibilità — riprovare o cambiare date");
   if (hasFormErrors)
     Object.values(formErrors).forEach((msg) => exportHints.push(msg!));
 

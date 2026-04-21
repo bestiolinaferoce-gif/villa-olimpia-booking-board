@@ -130,6 +130,14 @@ export type AvailabilityStatus =
   | "loading"
   | "available"
   | "unavailable"
+  /**
+   * La risposta è formalmente valida (ranges: [], HTTP 200) ma non
+   * abbastanza affidabile da concludere che la lodge sia libera.
+   * Cause tipiche: KV non configurato (nessuna sorgente dati reale) oppure
+   * payload in formato legacy senza timestamp di sincronizzazione.
+   * Export bloccato: non si genera un preventivo su disponibilità non verificata.
+   */
+  | "unknown"
   | "error";
 
 export type FormErrors = Partial<

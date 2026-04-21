@@ -50,12 +50,12 @@ function AvailabilityBadge({ status }: { status: AvailabilityStatus }) {
   const configs = {
     loading: {
       icon: <Loader2 size={14} style={{ ...ic, animation: "spin 1s linear infinite" }} />,
-      text: "Verifica disponibilità in corso…",
+      text: "Verifica in corso…",
       color: "var(--q-muted)",
     },
     available: {
       icon: <CheckCircle2 size={14} style={ic} />,
-      text: "Disponibile per le date selezionate",
+      text: "Disponibilità verificata — date libere",
       color: "#4ade80",
     },
     unavailable: {
@@ -63,14 +63,19 @@ function AvailabilityBadge({ status }: { status: AvailabilityStatus }) {
       text: "Date non disponibili per questa lodge",
       color: "#f87171",
     },
-    error: {
+    unknown: {
       icon: <AlertCircle size={14} style={ic} />,
-      text: "Impossibile verificare disponibilità — procedere con cautela",
+      text: "Verifica non conclusiva — sorgente dati non confermata. Export bloccato: contattare il gestore per conferma manuale.",
       color: "#fbbf24",
     },
-  } as const;
+    error: {
+      icon: <AlertCircle size={14} style={ic} />,
+      text: "Errore verifica disponibilità — riprovare o cambiare date",
+      color: "#f87171",
+    },
+  };
 
-  const cfg = configs[status];
+  const cfg = configs[status as keyof typeof configs];
   return (
     <p
       className="quotes-hint"
