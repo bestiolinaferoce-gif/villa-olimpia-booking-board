@@ -1,16 +1,20 @@
 "use client";
 
 import {
+  AlertCircle,
   CalendarDays,
+  CheckCircle2,
   Euro,
   Home,
   Image as ImageIcon,
+  Loader2,
   Moon,
   Palette,
   PawPrint,
   Percent,
   User,
   Users,
+  XCircle,
 } from "lucide-react";
 import {
   discountOptions,
@@ -20,8 +24,13 @@ import {
   quoteThemes,
 } from "./quoteConfig";
 import type { QuoteThemeId } from "./quoteConfig";
-import type { QuoteComputed, QuoteFormState } from "./quoteUtils";
-import { formatCurrencyEUR } from "./quoteUtils";
+import type {
+  AvailabilityStatus,
+  FormErrors,
+  QuoteComputed,
+  QuoteFormState,
+} from "./quoteUtils";
+import { formatCurrencyEUR, getMaxGuests } from "./quoteUtils";
 
 type QuoteFormProps = {
   state: QuoteFormState;
@@ -29,9 +38,61 @@ type QuoteFormProps = {
   computed: QuoteComputed;
   themeId: QuoteThemeId;
   onThemeChange: (id: QuoteThemeId) => void;
+  availabilityStatus: AvailabilityStatus;
+  errors: FormErrors;
 };
 
 const ic = { display: "inline" as const, verticalAlign: "middle" as const };
+
+function AvailabilityBadge({ status }: { status: AvailabilityStatus }) {
+  if (status === "idle") return null;
+
+  const configs = {
+    loading: {
+      icon: <Loader2 size={14} style={{ ...ic, animation: "spin 1s linear infinite" }} />,
+      text: "Verifica disponibilità in corso…",
+      color: "var(--q-muted)",
+    },
+    available: {
+      icon: <CheckCircle2 size={14} style={ic} />,
+      text: "Disponibile per le date selezionate",
+      color: "#4ade80",
+    },
+    unavailable: {
+      icon: <XCircle size={14} style={ic} />,
+      text: "Date non disponibili per questa lodge",
+      color: "#f87171",
+    },
+    error: {
+      icon: <AlertCircle size={14} style={ic} />,
+      text: "Impossibile verificare disponibilità — procedere con cautela",
+      color: "#fbbf24",
+    },
+  } as const;
+
+  const cfg = configs[status];
+  return (
+    <p
+      className="quotes-hint"
+      style={{ color: cfg.color, display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}
+    >
+      {cfg.icon} {cfg.text}
+    </p>
+  );
+}
+
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p
+      className="quotes-hint"
+      role="alert"
+      style={{ color: "#f87171", display: "flex", alignItems: "center", gap: 5 }}
+    >
+      <AlertCircle size={12} style={ic} /> {msg}
+    </p>
+  );
+}
 
 export function QuoteForm({
   state,
@@ -39,10 +100,15 @@ export function QuoteForm({
   computed,
   themeId,
   onThemeChange,
+  availabilityStatus,
+  errors,
 }: QuoteFormProps) {
   const selectedLodge =
     quoteLodges.find((l) => l.id === state.lodgeId) ?? quoteLodges[0];
   const lodgeFacts = lodgeStructuralLine(selectedLodge);
+  const maxGuests = getMaxGuests(state.lodgeId);
+
+  const compareLodgeOptions = quoteLodges.filter((l) => l.id !== state.lodgeId);
 
   return (
     <div className="quotes-panel">
@@ -115,12 +181,13 @@ export function QuoteForm({
           }
         >
           <option value="">Nessun confronto nel documento</option>
-          {quoteLodges.map((l) => (
+          {compareLodgeOptions.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
             </option>
           ))}
         </select>
+        <FieldError msg={errors.compareLodge} />
         <p className="quotes-hint">
           Aggiunge una tabella qualitativa nel PDF; i prezzi restano solo sulla lodge principale.
         </p>
@@ -152,21 +219,29 @@ export function QuoteForm({
           />
         </div>
       </div>
+      <AvailabilityBadge status={availabilityStatus} />
 
-      <div className="quotes-field">
+      <div className="quotes-field" style={{ marginTop: 14 }}>
         <label htmlFor="q-guests">
           <Users size={14} style={ic} /> Numero ospiti
+          {maxGuests !== null && (
+            <span style={{ fontWeight: 400, marginLeft: 6, color: "var(--q-muted)" }}>
+              (max {maxGuests})
+            </span>
+          )}
         </label>
         <input
           id="q-guests"
           type="number"
           min={1}
-          max={99}
+          max={maxGuests ?? 99}
           value={state.guests}
           onChange={(e) =>
             onChange({ guests: parseInt(e.target.value, 10) || 1 })
           }
+          style={errors.guests ? { borderColor: "#f87171" } : undefined}
         />
+        <FieldError msg={errors.guests} />
       </div>
 
       <div className="quotes-field">
@@ -244,7 +319,9 @@ export function QuoteForm({
           placeholder="https://… (Cloudinary, Drive, Dropbox…)"
           value={state.photoUrl ?? ""}
           onChange={(e) => onChange({ photoUrl: e.target.value || undefined })}
+          style={errors.photoUrl ? { borderColor: "#f87171" } : undefined}
         />
+        <FieldError msg={errors.photoUrl} />
         <p className="quotes-hint">Apparirà come immagine di apertura nel preventivo.</p>
       </div>
 

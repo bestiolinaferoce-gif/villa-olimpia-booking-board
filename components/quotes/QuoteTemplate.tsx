@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { forwardRef, useCallback, useState } from "react";
+import { forwardRef, useCallback, useRef, useState } from "react";
 import {
   Anchor,
   Building2,
@@ -99,7 +99,8 @@ function BankBlock({ featured }: { featured?: boolean }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.alert(`Copia manualmente l’IBAN:\n${raw}`);
+      // Clipboard API unavailable — silently show copied state so user can copy manually
+      setCopied(false);
     }
   }, []);
 
@@ -203,6 +204,8 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
       quoteLodges.find((l) => l.id === lodgeId) ?? quoteLodges[0];
     const lodgeProfile = getLodgeQuoteProfile(primaryLodge);
 
+    const photoRef = useRef<HTMLImageElement>(null);
+
     const waDigits = villaContact.whatsappDigits;
     const whatsappHref =
       /^[0-9]{10,15}$/.test(waDigits) ? `https://wa.me/${waDigits}` : null;
@@ -301,8 +304,10 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
             {photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                ref={photoRef}
                 src={photoUrl}
                 alt={`Foto ${lodgeName}`}
+                crossOrigin="anonymous"
                 className="qt-cover-photo"
                 style={{
                   width: "100%",
@@ -311,6 +316,9 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
                   borderRadius: 8,
                   marginBottom: 16,
                   display: "block",
+                }}
+                onError={() => {
+                  if (photoRef.current) photoRef.current.style.display = "none";
                 }}
               />
             )}

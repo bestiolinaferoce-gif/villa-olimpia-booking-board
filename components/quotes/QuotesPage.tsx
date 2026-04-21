@@ -4,7 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   lodgeStructuralLine,
   quoteLodges,
@@ -15,6 +15,8 @@ import { QuoteForm } from "./QuoteForm";
 import { QuoteTemplate } from "./QuoteTemplate";
 import {
   computeQuote,
+  validateQuoteForm,
+  type AvailabilityStatus,
   type QuoteFormState,
 } from "./quoteUtils";
 import "./quotes.css";
@@ -30,7 +32,7 @@ const QuotePdfExport = dynamic(
           className="quotes-btn quotes-btn-primary"
           disabled
         >
-          Caricamento PDF…
+          Caricamento…
         </button>
       </div>
     ),
@@ -50,6 +52,12 @@ const initial: QuoteFormState = {
   includePetDomestic: false,
 };
 
+type OccupiedRange = { start: string; end: string };
+
+function isOccupied(ranges: OccupiedRange[], checkIn: string, checkOut: string): boolean {
+  return ranges.some((r) => r.start < checkOut && r.end > checkIn);
+}
+
 export function QuotesPage() {
   const [themeId, setThemeId] = useState<QuoteThemeId>("blu-oro");
   const [state, setState] = useState<QuoteFormState>(initial);
@@ -59,28 +67,96 @@ export function QuotesPage() {
   );
   const issuedAt = useMemo(() => new Date().toISOString(), []);
 
+  const [availabilityStatus, setAvailabilityStatus] =
+    useState<AvailabilityStatus>("idle");
+
   const computed = useMemo(() => computeQuote(state), [state]);
+  const formErrors = useMemo(() => validateQuoteForm(state), [state]);
+  const hasFormErrors = Object.keys(formErrors).length > 0;
+
   const lodge =
     quoteLodges.find((l) => l.id === state.lodgeId) ?? quoteLodges[0];
   const lodgeFactsLine = lodgeStructuralLine(lodge);
   const compareLodge =
-    state.compareLodgeId &&
-    state.compareLodgeId !== state.lodgeId
+    state.compareLodgeId && state.compareLodgeId !== state.lodgeId
       ? quoteLodges.find((l) => l.id === state.compareLodgeId)
       : undefined;
+
+  // Verify availability against the booking board calendar on lodge/date change.
+  useEffect(() => {
+    if (!state.checkIn || !state.checkOut || computed.nights <= 0) {
+      setAvailabilityStatus("idle");
+      return;
+    }
+    setAvailabilityStatus("loading");
+    let cancelled = false;
+
+    fetch(`/api/public-availability?lodge=${encodeURIComponent(state.lodgeId)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{
+          ranges: OccupiedRange[] | null;
+          error?: string;
+        }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (!data.ranges) {
+          // 503 with ranges: null means KV unavailable — don't block but warn
+          setAvailabilityStatus("error");
+          return;
+        }
+        setAvailabilityStatus(
+          isOccupied(data.ranges, state.checkIn, state.checkOut)
+            ? "unavailable"
+            : "available"
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setAvailabilityStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state.lodgeId, state.checkIn, state.checkOut, computed.nights]);
 
   const canExport =
     state.clientName.trim().length > 0 &&
     Boolean(state.checkIn && state.checkOut) &&
     computed.nights > 0 &&
-    state.dailyRate > 0;
+    state.dailyRate > 0 &&
+    availabilityStatus === "available" &&
+    !hasFormErrors;
 
   function patch(next: Partial<QuoteFormState>) {
-    setState((s) => ({ ...s, ...next }));
+    setState((s) => {
+      const merged = { ...s, ...next };
+      // Auto-clear compareLodgeId if it equals the (new) primary lodge
+      if (merged.compareLodgeId && merged.compareLodgeId === merged.lodgeId) {
+        merged.compareLodgeId = "";
+      }
+      return merged;
+    });
   }
 
   const theme = quoteThemes[themeId] ?? quoteThemes["blu-oro"];
   const themeVars = theme.vars as CSSProperties;
+
+  const exportHints: string[] = [];
+  if (!state.clientName.trim()) exportHints.push("inserire il nome cliente");
+  if (!state.checkIn || !state.checkOut || computed.nights <= 0)
+    exportHints.push("scegliere date valide (check-out dopo check-in, almeno una notte)");
+  if (state.dailyRate <= 0)
+    exportHints.push("impostare la tariffa giornaliera maggiore di zero");
+  if (availabilityStatus === "unavailable")
+    exportHints.push("le date selezionate non sono disponibili per questa lodge");
+  if (availabilityStatus === "loading")
+    exportHints.push("verifica disponibilità in corso — attendere");
+  if (availabilityStatus === "error")
+    exportHints.push("verifica disponibilità non riuscita — riprovare o cambiare date");
+  if (hasFormErrors)
+    Object.values(formErrors).forEach((msg) => exportHints.push(msg!));
 
   return (
     <div className="quotes-page" data-theme={themeId} style={themeVars}>
@@ -102,14 +178,16 @@ export function QuotesPage() {
             computed={computed}
             themeId={themeId}
             onThemeChange={setThemeId}
+            availabilityStatus={availabilityStatus}
+            errors={formErrors}
           />
-          {!canExport && (
+          {exportHints.length > 0 && (
             <div className="quotes-export-hint no-print" role="status">
-              <strong>Per abilitare «Scarica PDF» e «Stampa / PDF sistema»</strong>
+              <strong>Per abilitare l&apos;export</strong>
               <ul>
-                <li>inserire il nome cliente</li>
-                <li>scegliere date valide (check-out dopo check-in, almeno una notte)</li>
-                <li>impostare la tariffa giornaliera maggiore di zero</li>
+                {exportHints.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
               </ul>
             </div>
           )}

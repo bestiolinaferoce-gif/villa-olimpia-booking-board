@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, parseISO, isValid } from "date-fns";
-import { policies, pricingDefaults } from "./quoteConfig";
+import { policies, pricingDefaults, quoteLodges } from "./quoteConfig";
 import type { QuoteLodgeId } from "./quoteConfig";
 
 export type QuoteFormState = {
@@ -123,6 +123,54 @@ export function formatDateIt(iso: string): string {
     month: "long",
     year: "numeric",
   }).format(d);
+}
+
+export type AvailabilityStatus =
+  | "idle"
+  | "loading"
+  | "available"
+  | "unavailable"
+  | "error";
+
+export type FormErrors = Partial<
+  Record<"guests" | "compareLodge" | "photoUrl", string>
+>;
+
+/** Ritorna la capienza massima nota per la lodge, o null se non dichiarata. */
+export function getMaxGuests(lodgeId: QuoteLodgeId): number | null {
+  const lodge = quoteLodges.find((l) => l.id === lodgeId);
+  if (!lodge) return null;
+  const row = lodge as Record<string, unknown>;
+  const mg = row.maxGuests;
+  return typeof mg === "number" && Number.isFinite(mg) ? mg : null;
+}
+
+/** Ritorna errori bloccanti sul form (vuoto = form valido). */
+export function validateQuoteForm(state: QuoteFormState): FormErrors {
+  const errors: FormErrors = {};
+
+  const max = getMaxGuests(state.lodgeId);
+  if (max !== null && state.guests > max) {
+    errors.guests = `Capienza massima: ${max} ospiti per questa lodge.`;
+  }
+
+  if (state.compareLodgeId && state.compareLodgeId === state.lodgeId) {
+    errors.compareLodge =
+      "Lodge di confronto uguale a quella principale — selezionarne una diversa o nessuna.";
+  }
+
+  if (state.photoUrl && state.photoUrl.trim().length > 0) {
+    try {
+      const u = new URL(state.photoUrl);
+      if (u.protocol !== "https:" && u.protocol !== "http:") {
+        errors.photoUrl = "URL non valido: deve iniziare con http:// o https://.";
+      }
+    } catch {
+      errors.photoUrl = "URL foto non valido.";
+    }
+  }
+
+  return errors;
 }
 
 /** IBAN leggibile con spazi (es. IT30 S034 …) */

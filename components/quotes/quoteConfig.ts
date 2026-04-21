@@ -139,8 +139,10 @@ export const quoteTheme = {
 export const villaContact = {
   name: "Villa Olimpia",
   email: "villaolimpiacaporizzuto@gmail.com",
-  whatsappDigits: "393XXXXXXXXX",
-  phoneDisplay: "—",
+  /** Cifre internazionali senza + (es. "393331234567"). Stringa vuota = nessun link WhatsApp nel PDF. */
+  whatsappDigits: "",
+  /** Numero visualizzato testualmente. Stringa vuota = non mostrato nel PDF. */
+  phoneDisplay: "",
   addressLine: "Capo Rizzuto (KR), Calabria",
   websiteNote: "Prenotazioni e informazioni su richiesta via email o WhatsApp.",
 } as const;
@@ -175,7 +177,7 @@ export const quoteDocument = {
   /** Intro personalizzata: il nome cliente viene interpolato in QuoteTemplate */
   clientGreetingLead: "Gentile",
   availabilityIntro:
-    "In base al periodo e al numero di ospiti indicati, verifichiamo la disponibilità del calendario lodge e proponiamo la soluzione più coerente con le vostre esigenze. Eventuali alternative (date o tipologia alloggio) vengono comunicate in fase di confronto diretto.",
+    "La disponibilità del calendario lodge viene verificata in fase di compilazione del preventivo. La proposta viene formulata solo su periodi risultati liberi al momento della generazione del documento. Eventuali variazioni successive (nuove prenotazioni ricevute tra la generazione e la conferma) vengono comunicate tempestivamente: la prenotazione si considera confermata solo dopo versamento dell'acconto.",
   choiceGuide:
     "Per orientare la scelta: lodge con maggiore capienza o più ambienti (es. Giglio, Frangipane, Geranio) sono spesso indicate per famiglie o gruppi; soluzioni più compatte possono risultare ideali per coppie o soggiorni brevi. La proposta economica sotto riportata si riferisce esclusivamente alla lodge selezionata nel modulo.",
   villaLead:
