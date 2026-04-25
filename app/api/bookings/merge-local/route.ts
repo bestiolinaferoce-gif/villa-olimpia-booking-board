@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Booking } from "@/lib/types";
+import { mergeBookings } from "@/lib/booking-sync";
 
 const BASE = process.env.KV_REST_API_URL ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
@@ -44,12 +45,10 @@ export async function POST(req: NextRequest) {
 
     const current = await readKV();
     const existing = (current?.data ?? []) as Booking[];
-    const existingIds = new Set(existing.map((b) => b.id));
-
-    const toAdd = incoming.filter((b) => b && b.id && !existingIds.has(b.id));
-    const merged = [...existing, ...toAdd].sort((a, b) =>
-      a.checkIn.localeCompare(b.checkIn)
-    );
+    const validIncoming = incoming.filter((b) => b && b.id);
+    const merged = mergeBookings(existing, validIncoming);
+    const mergedIds = new Set(existing.map((b) => b.id));
+    const insertedCount = validIncoming.filter((b) => !mergedIds.has(b.id)).length;
 
     const newPayload: KVPayload = {
       v: (current?.v ?? 0) + 1,
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
     await writeKV(newPayload);
 
     return NextResponse.json({
-      merged: toAdd.length,
+      merged: insertedCount,
       total: merged.length,
     });
   } catch (err) {

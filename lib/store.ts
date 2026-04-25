@@ -3,6 +3,7 @@ import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
 import type { BackupSnapshot, Booking, BookingFilters, BookingInput } from "@/lib/types";
 import { BACKUP_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
+import { mergeBookings, normalizeDataOrigin } from "@/lib/booking-sync";
 
 type BookingState = {
   bookings: Booking[];
@@ -87,6 +88,7 @@ function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Bookin
   return arr.map((item) => ({
     ...item,
     guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
+    dataOrigin: normalizeDataOrigin(item.dataOrigin),
   })) as Booking[];
 }
 
@@ -247,6 +249,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
       guestsCount: payload.guestsCount,
       createdAt: now,
       updatedAt: now,
+      dataOrigin: normalizeDataOrigin(payload.dataOrigin),
     };
     const next = [...bookings, booking].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
@@ -269,6 +272,11 @@ export const useBookingStore = create<BookingState>((set, get) => {
       notes: payload.notes.trim(),
       updatedAt: new Date().toISOString(),
       guestProfile: payload.guestProfile ?? current.guestProfile,
+      dataOrigin:
+        payload.dataOrigin ??
+        (normalizeDataOrigin(current.dataOrigin) === "sync"
+          ? "manual"
+          : normalizeDataOrigin(current.dataOrigin)),
     };
     const next = bookings.map((booking) => (booking.id === id ? updated : booking)).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
@@ -294,15 +302,14 @@ export const useBookingStore = create<BookingState>((set, get) => {
           depositAmount: Number(item.depositAmount ?? 0),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+          dataOrigin: normalizeDataOrigin(item.dataOrigin),
         };
       }) as Booking[];
 
-    const map = new Map<string, Booking>();
-    get().bookings.forEach((booking) => map.set(booking.id, booking));
-
     let merged = 0;
     let skipped = 0;
+    const currentBookings = get().bookings;
 
     normalized.forEach((candidate) => {
       try {
@@ -321,15 +328,23 @@ export const useBookingStore = create<BookingState>((set, get) => {
           depositReceived: candidate.depositReceived,
         };
         validateBookingPayload(payload);
-        ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
-        map.set(candidate.id, candidate);
-        merged += 1;
+        ensureNoOverlap(currentBookings, payload, candidate.id);
+        const mergedSet = mergeBookings(currentBookings, [candidate]);
+        const after = mergedSet.find((booking) => booking.id === candidate.id);
+        const before = currentBookings.find((booking) => booking.id === candidate.id);
+        if (after && after.updatedAt === candidate.updatedAt && (!before || before.updatedAt !== after.updatedAt)) {
+          merged += 1;
+        } else if (!before) {
+          merged += 1;
+        } else {
+          skipped += 1;
+        }
       } catch {
         skipped += 1;
       }
     });
 
-    const next = Array.from(map.values()).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+    const next = mergeBookings(currentBookings, normalized);
     set({ bookings: next });
     persist(next);
     return { merged, skipped };

@@ -1,3 +1,5 @@
+import type { BookingDataOrigin } from "@/lib/booking-sync";
+
 export const LODGES = [
   "Frangipane",
   "Fiordaliso",
@@ -51,6 +53,7 @@ export type Booking = {
   updatedAt: string;
   isNew?: boolean;
   guestProfile?: GuestProfile;
+  dataOrigin?: BookingDataOrigin;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;

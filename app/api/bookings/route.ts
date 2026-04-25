@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Booking } from '@/lib/types';
+import { mergeBookings } from '@/lib/booking-sync';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
@@ -38,17 +39,23 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Booking[] | { bookings: Booking[] };
     const bookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
     const { payload: current } = await readKV();
+    const merged = mergeBookings(current?.data ?? [], bookings);
     const newPayload: KVPayload = {
       v: (current?.v ?? 0) + 1,
       ts: new Date().toISOString(),
-      data: bookings,
+      data: merged,
     };
     await fetch(`${BASE}/pipeline`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify([['SET', KEY, JSON.stringify(newPayload)]]),
     });
-    return NextResponse.json({ ok: true, v: newPayload.v, ts: newPayload.ts });
+    return NextResponse.json({
+      ok: true,
+      v: newPayload.v,
+      ts: newPayload.ts,
+      total: merged.length,
+    });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
