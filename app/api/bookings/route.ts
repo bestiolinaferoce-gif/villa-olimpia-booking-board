@@ -36,10 +36,16 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!BASE || !TOKEN) return NextResponse.json({ ok: false });
   try {
-    const body = (await req.json()) as Booking[] | { bookings: Booking[] };
+    const body = (await req.json()) as
+      | Booking[]
+      | { bookings: Booking[]; mode?: 'merge' | 'replace' };
     const bookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
+    const mode = Array.isArray(body) ? 'merge' : (body.mode ?? 'merge');
     const { payload: current } = await readKV();
-    const merged = mergeBookings(current?.data ?? [], bookings);
+    const merged =
+      mode === 'replace'
+        ? mergeBookings([], bookings)
+        : mergeBookings(current?.data ?? [], bookings);
     const newPayload: KVPayload = {
       v: (current?.v ?? 0) + 1,
       ts: new Date().toISOString(),
@@ -52,6 +58,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({
       ok: true,
+      mode,
       v: newPayload.v,
       ts: newPayload.ts,
       total: merged.length,

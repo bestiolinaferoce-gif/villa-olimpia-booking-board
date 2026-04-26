@@ -102,25 +102,13 @@ function persistSettings(settings: { monthTheme: boolean }): void {
 export const useBookingStore = create<BookingState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function persist(bookings: Booking[]): void {
+  function persistLocal(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
     if (persistTimer !== null) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       persistTimer = null;
       const write = () => {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-        fetch("/api/bookings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookings }),
-        })
-          .then(async (r) => {
-            if (r.ok) {
-              const res = (await r.json()) as { ok: boolean; v?: number };
-              if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
-            }
-          })
-          .catch(() => set({ syncError: true }));
         const raw = window.localStorage.getItem(BACKUP_KEY);
         const current: BackupSnapshot[] = raw ? JSON.parse(raw) : [];
         const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
@@ -129,6 +117,64 @@ export const useBookingStore = create<BookingState>((set, get) => {
       if (typeof requestIdleCallback !== "undefined") requestIdleCallback(write);
       else write();
     }, 250);
+  }
+
+  async function mergeBookingsToCloud(bookings: Booking[]): Promise<void> {
+    try {
+      const r = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookings, mode: "merge" }),
+      });
+      if (!r.ok) throw new Error("merge failed");
+      const res = (await r.json()) as { ok: boolean; v?: number };
+      if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+    } catch {
+      set({ syncError: true });
+    }
+  }
+
+  async function replaceBookingsInCloud(bookings: Booking[]): Promise<void> {
+    try {
+      const r = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookings, mode: "replace" }),
+      });
+      if (!r.ok) throw new Error("replace failed");
+      const res = (await r.json()) as { ok: boolean; v?: number };
+      if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+    } catch {
+      set({ syncError: true });
+    }
+  }
+
+  async function updateBookingInCloud(id: string, booking: Booking): Promise<void> {
+    try {
+      const r = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(booking),
+      });
+      if (!r.ok) throw new Error("update failed");
+      const res = (await r.json()) as { ok: boolean; v?: number };
+      if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+    } catch {
+      set({ syncError: true });
+    }
+  }
+
+  async function deleteBookingInCloud(id: string): Promise<void> {
+    try {
+      const r = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error("delete failed");
+      const res = (await r.json()) as { ok: boolean; v?: number };
+      if (typeof res.v === "number") set({ serverVersion: res.v, syncError: false });
+    } catch {
+      set({ syncError: true });
+    }
   }
 
   return {
@@ -173,11 +219,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
         } else {
           const cur = get().bookings;
           if (cur.length > 0) {
-            fetch("/api/bookings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bookings: cur }),
-            }).catch(() => {});
+            replaceBookingsInCloud(cur).catch(() => {});
           }
         }
       })
@@ -253,7 +295,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
     };
     const next = [...bookings, booking].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
-    persist(next);
+    persistLocal(next);
+    mergeBookingsToCloud([booking]).catch(() => {});
     return booking;
   },
   updateBooking: (id, payload) => {
@@ -280,13 +323,15 @@ export const useBookingStore = create<BookingState>((set, get) => {
     };
     const next = bookings.map((booking) => (booking.id === id ? updated : booking)).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
-    persist(next);
+    persistLocal(next);
+    updateBookingInCloud(id, updated).catch(() => {});
     return updated;
   },
   deleteBooking: (id) => {
     const next = get().bookings.filter((booking) => booking.id !== id);
     set({ bookings: next });
-    persist(next);
+    persistLocal(next);
+    deleteBookingInCloud(id).catch(() => {});
   },
   importBookingsMerge: (incoming) => {
     const normalized = incoming
@@ -346,7 +391,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
     const next = mergeBookings(currentBookings, normalized);
     set({ bookings: next });
-    persist(next);
+    persistLocal(next);
+    mergeBookingsToCloud(normalized).catch(() => {});
     return { merged, skipped };
   },
   exportBookings: () => get().bookings,
@@ -361,7 +407,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
       const r = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookings: cur }),
+        body: JSON.stringify({ bookings: cur, mode: "replace" }),
       });
       if (r.ok) {
         const res = (await r.json()) as { ok: boolean; v?: number };
