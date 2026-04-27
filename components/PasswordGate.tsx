@@ -25,8 +25,12 @@ export function PasswordGate({
   if (unlocked) return <>{children}</>;
 
   function submit() {
-    const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "caccapanna73";
-    if (value === password) {
+    const fromEnv = process.env.NEXT_PUBLIC_APP_PASSWORD;
+    const password =
+      typeof fromEnv === "string" && fromEnv.trim().length > 0
+        ? fromEnv.trim()
+        : "caccapanna73";
+    if (value.trim() === password) {
       sessionStorage.setItem(AUTH_SESSION_KEY, "1");
       setUnlocked(true);
     } else {

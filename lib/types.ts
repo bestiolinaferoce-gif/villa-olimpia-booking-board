@@ -76,6 +76,10 @@ export type Booking = {
   guestProfile?: GuestProfile;
   /** Chi ha creato/ultimo merge noto (opzionale su dati legacy) */
   dataOrigin?: BookingDataOrigin;
+  /** Stato pratica adempimenti (Alloggiati Web / ROSS1000) */
+  reportingStatus?: GuestReportingStatus;
+  /** Note operative sull'invio (es. errore ricevuto, data invio manuale) */
+  reportingNotes?: string;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;
@@ -91,3 +95,22 @@ export type BackupSnapshot = {
   createdAt: string;
   bookings: Booking[];
 };
+
+// ---------------------------------------------------------------------------
+// Guest reporting pipeline (Alloggiati Web / ROSS1000)
+// ---------------------------------------------------------------------------
+
+export type GuestReportingStatus =
+  | "not_ready"        // dati ospite incompleti
+  | "ready"            // dati completi, pronto per invio
+  | "sent_alloggiati"  // inviato ad Alloggiati Web
+  | "sent_ross1000"    // inviato a ROSS1000
+  | "error";           // errore ultimo tentativo
+
+export const GUEST_REPORTING_STATUSES: readonly GuestReportingStatus[] = [
+  "not_ready",
+  "ready",
+  "sent_alloggiati",
+  "sent_ross1000",
+  "error",
+] as const;

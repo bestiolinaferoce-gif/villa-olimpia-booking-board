@@ -51,8 +51,8 @@ function formatImportMergeToast(
 }
 
 export default function Home() {
-  const { bookings, filters } = useBookingStore(
-    useShallow((s) => ({ bookings: s.bookings, filters: s.filters }))
+  const { bookings, filters, hasHydrated } = useBookingStore(
+    useShallow((s) => ({ bookings: s.bookings, filters: s.filters, hasHydrated: s.hasHydrated }))
   );
   const { currentMonth, prevMonth, nextMonth, setMonth: setStoreMonth } = useBookingStore(
     useShallow((s) => ({
@@ -334,6 +334,18 @@ export default function Home() {
       setPrintOptionsOpen(false);
     });
     window.print();
+  }
+
+  if (!hasHydrated) {
+    return (
+      <PasswordGate>
+        <main className="page-root">
+          <div className="loading-state" role="status">
+            Caricamento dati prenotazioni…
+          </div>
+        </main>
+      </PasswordGate>
+    );
   }
 
   return (

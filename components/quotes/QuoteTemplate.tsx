@@ -330,7 +330,13 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
 
             <div className="qt-cover-contacts">
               <span className="qt-cover-contacts-label">Contatti</span>
-              <a href={`mailto:${villaContact.email}`}>{villaContact.email}</a>
+              <a href={villaContact.websiteUrl} target="_blank" rel="noopener noreferrer">
+                villaolimpiacaporizzuto.com
+              </a>
+              {" · "}
+              <a className="qt-cover-email-link" href={`mailto:${villaContact.email}`}>
+                {villaContact.email}
+              </a>
               {whatsappHref ? (
                 <>
                   {" · "}
@@ -558,17 +564,30 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
 
             <section className="qt-section qt-policy" data-quote-section="condizioni">
               <h2>Condizioni di prenotazione e cancellazione</h2>
-              <ul>
-                <li>{policies.bookingNote}</li>
-                <li>
-                  <strong>Acconto e saldo:</strong> acconto {computed.depositPercent}% alla
-                  prenotazione; saldo {100 - computed.depositPercent}% come da{" "}
-                  {policies.balanceLabel.toLowerCase()}.
-                </li>
-                <li>{policies.cancellationFree}</li>
-                <li>{policies.cancellationAfter}</li>
-                <li>{policies.touristTaxNote}</li>
-              </ul>
+              <div className="qt-policy-timeline">
+                <div className="qt-policy-col">
+                  <h3 className="qt-policy-col-title">Conferma</h3>
+                  <p className="qt-policy-col-text">{policies.bookingNote}</p>
+                  <p className="qt-policy-col-text">
+                    <strong>Acconto e saldo:</strong> acconto {computed.depositPercent}% alla
+                    prenotazione; saldo {100 - computed.depositPercent}% come da{" "}
+                    {policies.balanceLabel.toLowerCase()}.
+                  </p>
+                </div>
+                <div className="qt-policy-col">
+                  <h3 className="qt-policy-col-title">Cancellazione</h3>
+                  <p className="qt-policy-col-text">{policies.cancellationFree}</p>
+                  <p className="qt-policy-col-text">{policies.cancellationAfter}</p>
+                </div>
+                <div className="qt-policy-col">
+                  <h3 className="qt-policy-col-title">Check-in</h3>
+                  <p className="qt-policy-col-text">
+                    Il saldo residuo ({100 - computed.depositPercent}%) è dovuto come da{" "}
+                    {policies.balanceLabel.toLowerCase()}.
+                  </p>
+                  <p className="qt-policy-col-text">{policies.touristTaxNote}</p>
+                </div>
+              </div>
             </section>
 
             <section className="qt-section qt-section--bank" data-quote-section="banca">
@@ -616,12 +635,20 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
                 <Phone size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
                 <strong>Contatti</strong>
               </p>
-              <p>
+              <p className="qt-cta-line">
+                Sito:{" "}
+                <a href={villaContact.websiteUrl} target="_blank" rel="noopener noreferrer">
+                  villaolimpiacaporizzuto.com
+                </a>
+              </p>
+              <p className="qt-cta-line">
                 Email:{" "}
-                <a href={`mailto:${villaContact.email}`}>{villaContact.email}</a>
+                <a className="qt-cta-email" href={`mailto:${villaContact.email}`}>
+                  {villaContact.email}
+                </a>
               </p>
               {whatsappHref && (
-                <p>
+                <p className="qt-cta-line">
                   WhatsApp:{" "}
                   <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
                     scrivici su WhatsApp

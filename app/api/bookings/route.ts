@@ -11,7 +11,7 @@ const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
 const KEY = 'vob_bookings';
 
-type KVPayload = { v: number; ts: string; data: Booking[] };
+type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
 
 const PROPERTY = 'villa-olimpia';
 
@@ -121,14 +121,23 @@ export async function POST(req: NextRequest) {
 
   if (!BASE || !TOKEN) return kvNotConfiguredResponse();
   try {
-    const body = (await req.json()) as Booking[] | { bookings: Booking[] };
-    const bookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
+    const body = (await req.json()) as Booking[] | { bookings: Booking[]; deletedIds?: string[] };
+    const requestedBookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
     const { payload: current } = await readKV();
+    const deletedIds = Array.from(
+      new Set([
+        ...(current?.deletedIds ?? []),
+        ...(!Array.isArray(body) && Array.isArray(body.deletedIds) ? body.deletedIds : []),
+      ])
+    );
+    const deletedSet = new Set(deletedIds);
+    const bookings = requestedBookings.filter((booking) => !deletedSet.has(booking.id));
     const events = collectBookingEvents(current?.data ?? [], bookings);
     const newPayload: KVPayload = {
       v: (current?.v ?? 0) + 1,
       ts: new Date().toISOString(),
       data: bookings,
+      deletedIds,
     };
     await fetch(`${BASE}/pipeline`, {
       method: 'POST',

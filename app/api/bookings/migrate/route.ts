@@ -6,7 +6,7 @@ const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
 const KEY = 'vob_bookings';
 
-type KVPayload = { v: number; ts: string; data: Booking[] };
+type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
 
 async function readKV(): Promise<KVPayload> {
   if (!BASE || !TOKEN) return { v: 0, ts: '', data: [] };
@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
 
     const current = await readKV();
     const existingIds = new Set(current.data.map((b) => b.id));
+    const deletedIds = new Set(current.deletedIds ?? []);
 
     let inserted = 0;
     let skipped = 0;
     const merged = [...current.data];
 
     for (const booking of incoming) {
-      if (!booking.id || existingIds.has(booking.id)) {
+      if (!booking.id || existingIds.has(booking.id) || deletedIds.has(booking.id)) {
         skipped += 1;
       } else {
         merged.push(booking);
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       v: current.v + 1,
       ts: new Date().toISOString(),
       data: merged,
+      deletedIds: current.deletedIds,
     };
 
     await fetch(`${BASE}/pipeline`, {

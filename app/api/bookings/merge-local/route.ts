@@ -12,7 +12,7 @@ const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
 const KEY = "vob_bookings";
 const PROPERTY = "villa-olimpia";
 
-type KVPayload = { v: number; ts: string; data: Booking[] };
+type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
 
 function bookingUpdatedMs(booking: Booking): number {
   const ts = Date.parse(booking.updatedAt || booking.createdAt || "");
@@ -121,6 +121,11 @@ async function writeKV(payload: KVPayload): Promise<void> {
   });
 }
 
+function normalizeDeletedIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((id) => String(id).trim()).filter(Boolean);
+}
+
 export async function POST(req: NextRequest) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
@@ -128,20 +133,23 @@ export async function POST(req: NextRequest) {
   if (!BASE || !TOKEN) return kvNotConfiguredResponse();
 
   try {
-    const body = (await req.json()) as { bookings: Booking[] };
+    const body = (await req.json()) as { bookings: Booking[]; deletedIds?: string[] };
     const incoming = body?.bookings;
     if (!Array.isArray(incoming)) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
+    const deletedIds = new Set(normalizeDeletedIds(body.deletedIds));
 
     const current = await readKV();
-    const existing = (current?.data ?? []) as Booking[];
+    for (const id of current?.deletedIds ?? []) deletedIds.add(id);
+    const existing = ((current?.data ?? []) as Booking[]).filter((booking) => !deletedIds.has(booking.id));
     const mergedMap = new Map(existing.map((booking) => [booking.id, booking]));
     let mergedCount = 0;
     let updatedCount = 0;
 
     for (const booking of incoming) {
       if (!booking || !booking.id) continue;
+      if (deletedIds.has(booking.id)) continue;
       const previous = mergedMap.get(booking.id);
       if (!previous) {
         mergedMap.set(booking.id, booking);
@@ -160,6 +168,7 @@ export async function POST(req: NextRequest) {
       v: (current?.v ?? 0) + 1,
       ts: new Date().toISOString(),
       data: merged,
+      deletedIds: Array.from(deletedIds),
     };
 
     await writeKV(newPayload);

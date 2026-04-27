@@ -1,11 +1,12 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { addDays, differenceInDays, format, parseISO } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type GuestProfile, type Lodge } from "@/lib/types";
+import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type GuestProfile, type GuestReportingStatus, type Lodge } from "@/lib/types";
+import { buildAlloggiatiFileContent, alloggiatiFilename, isAlloggiatiReady } from "@/lib/integrations/alloggiati";
 
 type BookingDialogProps = {
   open: boolean;
@@ -91,6 +92,8 @@ export function BookingDialog({
         childrenCount: booking.childrenCount,
         economicNotes: booking.economicNotes,
         dataOrigin: booking.dataOrigin,
+        reportingStatus: booking.reportingStatus,
+        reportingNotes: booking.reportingNotes,
       });
       setError("");
       setFieldErrors({});
@@ -124,45 +127,13 @@ export function BookingDialog({
   }
 
   function exportAlloggiati(b: Booking) {
-    const p = b.guestProfile ?? {};
-    const docTypeMap: Record<string, string> = {
-      CARTA_IDENTITA: "IDENT",
-      PASSAPORTO: "PASOR",
-      PATENTE: "PATEG",
-      PERMESSO_SOGGIORNO: "PERMS",
-    };
-    const fmtDate = (d?: string) => {
-      if (!d) return "          ";
-      const [y, m, g] = d.split("-");
-      return `${g}/${m}/${y}`;
-    };
-    const pad = (s: string, len: number) => s.substring(0, len).padEnd(len, " ");
-    const padNum = (n: number, len: number) => String(n).padStart(len, "0");
-    const nights = differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn));
-    const gender = p.gender === "M" ? "1" : p.gender === "F" ? "2" : "9";
-    const docType = docTypeMap[p.documentType ?? ""] ?? "IDENT";
-    const row = [
-      "16",
-      fmtDate(b.checkIn),
-      padNum(nights, 4),
-      pad(p.surname ?? b.guestName, 50),
-      pad(p.firstName ?? "", 30),
-      gender,
-      fmtDate(p.birthDate),
-      pad(p.birthPlace ?? "", 9),
-      pad(p.birthProvince ?? "  ", 2),
-      pad(p.birthCountry ?? "Z000", 9),
-      pad(p.nationality ?? "Z000", 9),
-      pad(docType, 5),
-      pad(p.documentNumber ?? "", 20),
-      pad(p.documentIssuePlace ?? "", 9),
-    ].join("");
-    const filename = `alloggiati_${b.guestName.replace(/\s+/g, "_")}_${b.checkIn}.txt`;
-    const blob = new Blob([row + "\r\n"], { type: "text/plain;charset=utf-8" });
+    const content = buildAlloggiatiFileContent(b);
+    if (!content) return;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = alloggiatiFilename(b);
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -228,6 +199,17 @@ export function BookingDialog({
               </button>
             </Dialog.Close>
           </div>
+
+          {booking?.dataOrigin === "sync" && booking?.channel === "airbnb" && (
+            <div className="sync-origin-badge">
+              <span className="sync-origin-icon">🔄</span>
+              <span>
+                <strong>Prenotazione Airbnb sincronizzata automaticamente.</strong>{" "}
+                Puoi modificare note, importi e anagrafica — non verranno sovrascritti dal sync.
+                Date e stato vengono aggiornati dal feed Airbnb.
+              </span>
+            </div>
+          )}
 
           <div style={{ display: "grid", gap: "12px" }}>
             <div className="form-section">
@@ -319,6 +301,39 @@ export function BookingDialog({
               </label>
             </div>
             <div className="form-section">
+              <p className="form-section-title">Stato Pratica Adempimenti</p>
+              <div className="form-grid">
+                <label>
+                  Stato invio
+                  <select
+                    value={form.reportingStatus ?? "not_ready"}
+                    onChange={(e) => change("reportingStatus", e.target.value as GuestReportingStatus)}
+                  >
+                    <option value="not_ready">Non pronto — dati incompleti</option>
+                    <option value="ready">Pronto per invio</option>
+                    <option value="sent_alloggiati">Inviato — Alloggiati Web</option>
+                    <option value="sent_ross1000">Inviato — ROSS1000</option>
+                    <option value="error">Errore invio</option>
+                  </select>
+                </label>
+                <label className="full-width">
+                  Note operative
+                  <input
+                    value={form.reportingNotes ?? ""}
+                    placeholder="Es. data invio, errore ricevuto, invio manuale…"
+                    onChange={(e) => change("reportingNotes", e.target.value || undefined)}
+                  />
+                </label>
+              </div>
+              {form.reportingStatus === "not_ready" && booking && !isAlloggiatiReady(booking) && (
+                <p className="reporting-hint">
+                  ⚠ Dati mancanti per Alloggiati Web: compila cognome, nome, sesso, data di nascita,
+                  comune/stato nascita, cittadinanza, tipo e numero documento, luogo rilascio.
+                </p>
+              )}
+            </div>
+
+            <div className="form-section">
               <button type="button" className="section-toggle" onClick={() => setShowProfile((v) => !v)}>
                 {showProfile ? "▼" : "▶"} Anagrafica &amp; Documenti
                 {form.guestProfile?.fiscalCode && <span className="profile-complete-badge">✓ completa</span>}
@@ -370,7 +385,7 @@ export function BookingDialog({
                   <button type="button" className="danger-btn" onClick={() => setDeleteConfirm(true)}>
                     Elimina
                   </button>
-                  {booking?.guestProfile?.surname && (
+                  {booking && isAlloggiatiReady(booking) && (
                     <button type="button" className="alloggiati-btn" onClick={() => exportAlloggiati(booking)} title="Prepara file per Portale Alloggiati Web">
                       📋 Alloggiati
                     </button>

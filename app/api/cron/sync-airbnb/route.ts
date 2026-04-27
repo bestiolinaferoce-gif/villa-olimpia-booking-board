@@ -12,6 +12,8 @@ const BASE  = process.env.KV_REST_API_URL   ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
 const KEY   = "vob_bookings";
 
+type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
+
 function getSyncConfigs(): AirbnbSyncConfig[] {
   const mappings: Array<{ envKey: string; lodge: Lodge; defaultGuests: number }> = [
     { envKey: "AIRBNB_ICAL_FRANGIPANE", lodge: "Frangipane", defaultGuests: 4 },
@@ -33,18 +35,28 @@ function getSyncConfigs(): AirbnbSyncConfig[] {
     }));
 }
 
-async function readAllBookings(): Promise<Booking[]> {
-  if (!BASE || !TOKEN) return [];
+async function readPayload(): Promise<KVPayload> {
+  if (!BASE || !TOKEN) return { v: 0, ts: "", data: [], deletedIds: [] };
   try {
     const res = await fetch(`${BASE}/get/${KEY}`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
       cache: "no-store",
     });
     const json = (await res.json()) as { result: string | null };
-    if (!json.result) return [];
+    if (!json.result) return { v: 0, ts: "", data: [], deletedIds: [] };
     const parsed = JSON.parse(json.result);
-    return Array.isArray(parsed) ? parsed : (parsed?.data ?? []);
-  } catch { return []; }
+    if (Array.isArray(parsed)) {
+      return { v: 1, ts: "", data: parsed, deletedIds: [] };
+    }
+    return {
+      v: parsed?.v ?? 0,
+      ts: parsed?.ts ?? "",
+      data: parsed?.data ?? [],
+      deletedIds: parsed?.deletedIds ?? [],
+    };
+  } catch {
+    return { v: 0, ts: "", data: [], deletedIds: [] };
+  }
 }
 
 interface SyncResult {
@@ -59,7 +71,8 @@ interface SyncResult {
 
 async function syncProperty(
   config: AirbnbSyncConfig,
-  existing: Booking[]
+  existing: Booking[],
+  deletedIds: Set<string>
 ): Promise<{ bookings: Booking[]; result: SyncResult }> {
   const result: SyncResult = { lodge: config.lodge, fetched: 0, created: 0, updated: 0, cancelled: 0, skipped: 0 };
 
@@ -85,6 +98,10 @@ async function syncProperty(
 
   for (const event of events) {
     const id  = airbnbBookingId(event.confirmationCode);
+    if (deletedIds.has(id)) {
+      result.skipped++;
+      continue;
+    }
     const idx = updated.findIndex((b) => b.id === id);
 
     if (idx === -1) {
@@ -147,11 +164,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Nessuna variabile AIRBNB_ICAL_* trovata." });
   }
 
-  let bookings = await readAllBookings();
+  const payload = await readPayload();
+  const deletedIds = new Set(payload.deletedIds ?? []);
+  let bookings = payload.data.filter((booking) => !deletedIds.has(booking.id));
   const results: SyncResult[] = [];
 
   for (const config of configs) {
-    const { bookings: merged, result } = await syncProperty(config, bookings);
+    const { bookings: merged, result } = await syncProperty(config, bookings, deletedIds);
     bookings = merged;
     results.push(result);
   }
@@ -179,7 +198,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/json",
         ...(writeToken ? { "x-internal-token": writeToken } : {}),
       },
-      body: JSON.stringify(bookings),
+      body: JSON.stringify({ bookings, deletedIds: Array.from(deletedIds) }),
     });
 
     if (!writeRes.ok) {

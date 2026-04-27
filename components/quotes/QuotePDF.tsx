@@ -30,7 +30,7 @@ export function QuotePdfExport({ targetRef, disabled }: QuotePdfProps) {
         useCORS: true,
         allowTaint: false,
         logging: false,
-        backgroundColor: "#f8f6f0",
+        backgroundColor: "#FAFAF8",
         scrollX: 0,
         scrollY: -window.scrollY,
         imageTimeout: 8000,

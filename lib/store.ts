@@ -27,6 +27,7 @@ type BookingState = {
   currentMonth: string;
   filters: BookingFilters;
   monthTheme: boolean;
+  hasHydrated: boolean;
   serverVersion: number;
   syncError: boolean;
   hasNewBookings: boolean;
@@ -239,18 +240,18 @@ function mergeEnrichedLocal(merged: Booking[], serverRows: Booking[]): boolean {
   return false;
 }
 
-function normalizePayload(payload: { v?: number; data?: Booking[] } | Booking[] | null): { version: number; data: Booking[] } {
-  if (!payload) return { version: 0, data: [] }
-  if (Array.isArray(payload)) return { version: 0, data: payload }
-  return { version: payload.v ?? 0, data: payload.data ?? [] }
+function normalizePayload(payload: { v?: number; data?: Booking[]; deletedIds?: string[] } | Booking[] | null): { version: number; data: Booking[]; deletedIds: string[] } {
+  if (!payload) return { version: 0, data: [], deletedIds: [] }
+  if (Array.isArray(payload)) return { version: 0, data: payload, deletedIds: [] }
+  return { version: payload.v ?? 0, data: payload.data ?? [], deletedIds: payload.deletedIds ?? [] }
 }
 
-async function fetchCloudPayload(): Promise<{ version: number; data: Booking[] }> {
+async function fetchCloudPayload(): Promise<{ version: number; data: Booking[]; deletedIds: string[] }> {
   const response = await fetch("/api/bookings", { cache: "no-store" })
   if (!response.ok) {
     throw new Error("cloud fetch failed")
   }
-  const payload = (await response.json()) as { v?: number; data?: Booking[] } | Booking[]
+  const payload = (await response.json()) as { v?: number; data?: Booking[]; deletedIds?: string[] } | Booking[]
   return normalizePayload(payload)
 }
 
@@ -270,6 +271,7 @@ function persistSettings(patch: Partial<{ monthTheme: boolean; serverVersion: nu
 
 export const useBookingStore = create<BookingState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  let remotePersistSeq = 0;
 
   function pushBackupSnapshot(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
@@ -284,17 +286,28 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
   function persist(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+      const current = readBackupSnapshotsFromLocal();
+      const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
+      window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+    } catch {
+      set({ syncError: true });
+      return;
+    }
+
     if (persistTimer !== null) clearTimeout(persistTimer);
+    const seq = ++remotePersistSeq;
     persistTimer = setTimeout(() => {
       persistTimer = null;
       const write = () => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-        fetch("/api/bookings", {
+        fetch("/api/bookings/merge-local", {
           method: "POST",
           headers: internalPostBookingsHeaders(),
-          body: JSON.stringify({ bookings }),
+          body: JSON.stringify({ bookings, deletedIds: Array.from(get().deletedIds) }),
         })
           .then(async (r) => {
+            if (seq !== remotePersistSeq) return;
             if (!r.ok) {
               set({ syncError: true });
               return;
@@ -316,9 +329,6 @@ export const useBookingStore = create<BookingState>((set, get) => {
             }
           })
           .catch(() => set({ syncError: true }));
-        const current = readBackupSnapshotsFromLocal();
-        const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
-        window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
       };
       if (typeof requestIdleCallback !== "undefined") requestIdleCallback(write);
       else write();
@@ -335,6 +345,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     showCancelled: false,
   },
   monthTheme: true,
+  hasHydrated: false,
   toast: null,
   serverVersion: 0,
   syncError: false,
@@ -362,10 +373,19 @@ export const useBookingStore = create<BookingState>((set, get) => {
         set({ bookings: cleaned });
       } catch { /* ignore */ }
     }
+    set({ hasHydrated: true });
     fetch("/api/bookings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((payload: { v: number; ts: string; data: Booking[] } | null) => {
+      .then((payload: { v: number; ts: string; data: Booking[]; deletedIds?: string[] } | Booking[] | null) => {
         if (!payload) return;
+        const serverDeletedIds = !Array.isArray(payload) && Array.isArray(payload.deletedIds)
+          ? new Set(payload.deletedIds)
+          : new Set<string>();
+        if (serverDeletedIds.size > 0) {
+          const combinedDeletedIds = new Set([...get().deletedIds, ...serverDeletedIds]);
+          set({ deletedIds: combinedDeletedIds });
+          persistDeletedIds(combinedDeletedIds);
+        }
         const data = Array.isArray(payload) ? payload : (payload.data ?? []);
         if (data.length > 0) {
           const incomingV =
@@ -388,10 +408,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
         } else {
           const cur = get().bookings;
           if (cur.length > 0) {
-            fetch("/api/bookings", {
+            fetch("/api/bookings/merge-local", {
               method: "POST",
               headers: internalPostBookingsHeaders(),
-              body: JSON.stringify({ bookings: cur }),
+              body: JSON.stringify({ bookings: cur, deletedIds: Array.from(get().deletedIds) }),
             })
               .then(async (postRes) => {
                 if (!postRes.ok) {
@@ -433,12 +453,20 @@ export const useBookingStore = create<BookingState>((set, get) => {
         if (v > currentVersion) {
           const full = await fetch("/api/bookings", { cache: "no-store" });
           if (!full.ok) throw new Error("full fetch failed");
-          const payload = (await full.json()) as { v?: number; data?: Booking[] } | Booking[];
+          const payload = (await full.json()) as { v?: number; data?: Booking[]; deletedIds?: string[] } | Booking[];
           const newV = Array.isArray(payload) ? v : (payload.v ?? v);
           if (newV < get().serverVersion) {
             return;
           }
           const data = Array.isArray(payload) ? payload : (payload.data ?? []);
+          const serverDeletedIds = !Array.isArray(payload) && Array.isArray((payload as { deletedIds?: string[] }).deletedIds)
+            ? new Set((payload as { deletedIds?: string[] }).deletedIds)
+            : new Set<string>();
+          if (serverDeletedIds.size > 0) {
+            const combinedDeletedIds = new Set([...get().deletedIds, ...serverDeletedIds]);
+            set({ deletedIds: combinedDeletedIds });
+            persistDeletedIds(combinedDeletedIds);
+          }
           const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
           const localRows = get().bookings;
           const combined = mergeKvWithLocal(migrated, localRows, get().deletedIds);
@@ -679,7 +707,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
       const mergeRes = await fetch("/api/bookings/merge-local", {
         method: "POST",
         headers: internalPostBookingsHeaders(),
-        body: JSON.stringify({ bookings: cur }),
+        body: JSON.stringify({ bookings: cur, deletedIds: Array.from(get().deletedIds) }),
       });
       if (!mergeRes.ok) {
         get().showToast("Errore durante il caricamento sul cloud.", "error");
@@ -687,7 +715,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
       }
 
       const cloud = await fetchCloudPayload()
-      const merged = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), cur)
+      const cloudDeletedIds = new Set([...get().deletedIds, ...cloud.deletedIds])
+      const merged = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), cur, cloudDeletedIds)
+      set({ deletedIds: cloudDeletedIds })
+      persistDeletedIds(cloudDeletedIds)
       set({ bookings: merged, serverVersion: cloud.version, syncError: false })
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
       persistSettings({ serverVersion: cloud.version })
@@ -710,7 +741,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
       const res = await fetch("/api/bookings/merge-local", {
         method: "POST",
         headers: internalPostBookingsHeaders(),
-        body: JSON.stringify({ bookings: local }),
+        body: JSON.stringify({ bookings: local, deletedIds: Array.from(get().deletedIds) }),
       });
       const data = (await res.json()) as {
         merged?: number;
@@ -722,7 +753,10 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
       if (res.ok) {
         const cloud = await fetchCloudPayload();
-        const mergedRows = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), local);
+        const cloudDeletedIds = new Set([...get().deletedIds, ...cloud.deletedIds]);
+        const mergedRows = mergeKvWithLocal(migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>), local, cloudDeletedIds);
+        set({ deletedIds: cloudDeletedIds });
+        persistDeletedIds(cloudDeletedIds);
         set({ bookings: mergedRows, serverVersion: cloud.version, syncError: false });
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedRows));

@@ -6,7 +6,7 @@ const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
 const KEY = 'vob_bookings';
 
-type KVPayload = { v: number; ts: string; data: Booking[] };
+type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
 
 async function readKV(): Promise<KVPayload> {
   if (!BASE || !TOKEN) return { v: 0, ts: '', data: [] };
@@ -54,6 +54,7 @@ export async function PUT(
       v: current.v + 1,
       ts: new Date().toISOString(),
       data: newData,
+      deletedIds: current.deletedIds,
     };
     await writeKV(newPayload);
     return NextResponse.json({ ok: true, booking: updated, v: newPayload.v });
@@ -80,6 +81,7 @@ export async function DELETE(
       v: current.v + 1,
       ts: new Date().toISOString(),
       data: newData,
+      deletedIds: Array.from(new Set([...(current.deletedIds ?? []), id])),
     };
     await writeKV(newPayload);
     return NextResponse.json({ ok: true, v: newPayload.v });
