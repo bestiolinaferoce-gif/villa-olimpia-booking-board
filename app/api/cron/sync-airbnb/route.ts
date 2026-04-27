@@ -105,8 +105,22 @@ async function syncProperty(
     const idx = updated.findIndex((b) => b.id === id);
 
     if (idx === -1) {
-      updated.push(icalEventToBooking(event, config.lodge, config.defaultGuestsCount));
-      result.created++;
+      // Don't create a sync record if a manual entry already covers this lodge+period.
+      // The operator has already entered the booking manually with the correct amounts.
+      const coveredByManual = updated.some(
+        (b) =>
+          b.lodge === config.lodge &&
+          b.dataOrigin !== "sync" &&
+          b.status !== "cancelled" &&
+          b.checkIn < event.dtend &&
+          b.checkOut > event.dtstart
+      );
+      if (coveredByManual) {
+        result.skipped++;
+      } else {
+        updated.push(icalEventToBooking(event, config.lodge, config.defaultGuestsCount));
+        result.created++;
+      }
     } else {
       const b = updated[idx];
       // Only update guestName from feed if operator has not corrected it yet.
