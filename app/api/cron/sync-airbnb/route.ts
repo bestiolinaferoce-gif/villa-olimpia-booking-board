@@ -152,10 +152,16 @@ async function syncProperty(
 }
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET ?? "";
-  const auth = req.headers.get("authorization");
-  const qs   = req.nextUrl.searchParams.get("secret");
-  if (cronSecret && auth !== `Bearer ${cronSecret}` && qs !== cronSecret) {
+  const cronSecret  = process.env.CRON_SECRET ?? "";
+  const writeSecret = getBookingApiWriteSecret();
+  const auth        = req.headers.get("authorization");
+  const internalTok = (req.headers.get("x-internal-token") ?? "").trim();
+  const qs          = req.nextUrl.searchParams.get("secret");
+
+  const validCron  = cronSecret  && (auth === `Bearer ${cronSecret}`  || qs === cronSecret);
+  const validWrite = writeSecret && internalTok === writeSecret;
+
+  if (cronSecret && !validCron && !validWrite) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

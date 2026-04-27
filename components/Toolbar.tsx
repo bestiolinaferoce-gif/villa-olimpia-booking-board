@@ -49,6 +49,7 @@ type ToolbarProps = {
   onCopyIcal: () => void;
   onForceSync: () => void;
   onSyncLocal?: () => void;
+  onSyncAirbnb?: () => void;
   syncError: boolean;
   integrationStatus?: { n8nConfigured: boolean; kvConfigured: boolean } | null;
   hasNewBookings?: boolean;
@@ -83,6 +84,7 @@ export function Toolbar({
   onCopyIcal,
   onForceSync,
   onSyncLocal,
+  onSyncAirbnb,
   syncError,
   integrationStatus,
   hasNewBookings = false,
@@ -235,6 +237,16 @@ export function Toolbar({
               onClick={onSyncLocal}
             >
               ☁️ Aggiorna
+            </button>
+          )}
+          {onSyncAirbnb && (
+            <button
+              type="button"
+              className="ghost-btn"
+              title="Importa nuove prenotazioni da Airbnb ora (senza aspettare il cron notturno)"
+              onClick={onSyncAirbnb}
+            >
+              🏠 Sync Airbnb
             </button>
           )}
           {integrationStatus && (

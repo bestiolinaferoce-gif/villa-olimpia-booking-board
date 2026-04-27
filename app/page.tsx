@@ -73,7 +73,7 @@ export default function Home() {
       setShowCancelled: s.setShowCancelled,
     }))
   );
-  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, syncLocalToCloud } = useBookingStore(
+  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, syncLocalToCloud, syncAirbnb } = useBookingStore(
     useShallow((s) => ({
       load: s.load,
       startPolling: s.startPolling,
@@ -88,6 +88,7 @@ export default function Home() {
       showToast: s.showToast,
       forceSyncToCloud: s.forceSyncToCloud,
       syncLocalToCloud: s.syncLocalToCloud,
+      syncAirbnb: s.syncAirbnb,
     }))
   );
 
@@ -373,6 +374,7 @@ export default function Home() {
         onCopyIcal={onCopyIcal}
         onForceSync={() => forceSyncToCloud()}
         onSyncLocal={() => syncLocalToCloud()}
+        onSyncAirbnb={() => syncAirbnb()}
         syncError={syncError}
         integrationStatus={integrationStatus}
         hasNewBookings={hasNewBookings}

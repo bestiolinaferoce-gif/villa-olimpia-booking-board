@@ -55,6 +55,7 @@ type BookingState = {
   exportBookings: () => Booking[];
   forceSyncToCloud: () => Promise<void>;
   syncLocalToCloud: () => Promise<{ merged: number; updated: number; total: number }>;
+  syncAirbnb: () => Promise<void>;
   toast: { message: string; type: "success" | "error"; durationMs?: number } | null;
   showToast: (message: string, type?: "success" | "error", durationMs?: number) => void;
   clearToast: () => void;
@@ -776,6 +777,43 @@ export const useBookingStore = create<BookingState>((set, get) => {
     } catch {
       get().showToast("Errore di rete durante la sincronizzazione.", "error");
       return { merged: 0, updated: 0, total: 0 };
+    }
+  },
+
+  syncAirbnb: async () => {
+    if (typeof window === "undefined") return;
+    get().showToast("Sync Airbnb in corso…", "success", 60000);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+      if (typeof token === "string" && token.length > 0) {
+        headers["X-Internal-Token"] = token;
+      }
+      const res = await fetch("/api/cron/sync-airbnb", { headers, cache: "no-store" });
+      const data = await res.json() as { ok: boolean; totalChanges?: number; summary?: string; message?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        get().showToast("Sync Airbnb fallito: " + (data.message ?? data.error ?? `HTTP ${res.status}`), "error");
+        return;
+      }
+      const changes = data.totalChanges ?? 0;
+      if (changes > 0) {
+        // Reload from cloud so UI reflects new bookings immediately
+        const cloud = await fetchCloudPayload();
+        const cloudDeletedIds = new Set([...get().deletedIds, ...cloud.deletedIds]);
+        const merged = mergeKvWithLocal(
+          migrateBookings(cloud.data as Array<Booking & { guestName?: string; guestsCount?: number }>),
+          get().bookings,
+          cloudDeletedIds
+        );
+        set({ bookings: merged, serverVersion: cloud.version, syncError: false });
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        persistSettings({ serverVersion: cloud.version });
+        get().showToast(`✓ Airbnb sync: ${changes} modifiche — ${data.summary ?? ""}`, "success", 8000);
+      } else {
+        get().showToast("✓ Airbnb sync: nessuna novità.", "success", 4000);
+      }
+    } catch {
+      get().showToast("Errore di rete durante sync Airbnb.", "error");
     }
   },
   };
