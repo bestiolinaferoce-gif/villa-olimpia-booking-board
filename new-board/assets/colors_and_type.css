@@ -1,0 +1,214 @@
+/* ================================================================
+   Villa Olimpia — Colors & Typography
+   Derived from the production site: tailwind.config.ts + app/globals.css
+   ================================================================ */
+
+/* ---------- Fonts -------------------------------------------------
+   The production site uses Google-hosted Inter + Playfair Display
+   (next/font). We reference them via the same CDN so designs pick up
+   the real metrics. Keep weights conservative: the site uses 400/500/
+   600/700 for body (Inter) and 400/700 for display (Playfair).
+   ---------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&display=swap');
+
+:root {
+  /* ----------------------------------------------------------------
+     BRAND COLORS  (from tailwind.config.ts → Villa Olimpia palette)
+     ---------------------------------------------------------------- */
+
+  /* Ocean — blu mare, primary brand color */
+  --vo-ocean:        #0077BE;
+  --vo-ocean-light:  #0099E6;
+  --vo-ocean-dark:   #005A8F;
+
+  /* Gold — caldo accento mediterraneo (CTAs, premium badges, sunset) */
+  --vo-gold:         #FFC107;
+  --vo-gold-light:   #FFD54F;
+  --vo-gold-dark:    #FFA000;
+
+  /* Turquoise — Area Marina Protetta, freschezza, acque cristalline */
+  --vo-turquoise:        #00A896;
+  --vo-turquoise-light:  #00C9A7;
+  --vo-turquoise-dark:   #008B75;
+
+  /* Beige / neutrals warm — avorio, calcare mediterraneo */
+  --vo-beige:        #F8FAFC;
+  --vo-beige-light:  #FFFFFF;
+  --vo-beige-dark:   #E2E8F0;
+
+  /* Deep navy — monogramma "VO", contrasto scuro su bianco */
+  --vo-ink-900:      #0f3b57;
+  --vo-ink-700:      #0a7a8c;
+  --vo-sand-50:      #f5efe4; /* colore glifo monogramma */
+
+  /* ----------------------------------------------------------------
+     SEMANTIC (shadcn-style, mirrors app/globals.css)
+     Values match HSL tokens shipped with the site.
+     ---------------------------------------------------------------- */
+  --background:              hsl(0 0% 100%);
+  --foreground:              hsl(222.2 84% 4.9%);
+  --card:                    hsl(0 0% 100%);
+  --card-foreground:         hsl(222.2 84% 4.9%);
+  --popover:                 hsl(0 0% 100%);
+  --popover-foreground:      hsl(222.2 84% 4.9%);
+  --primary:                 hsl(200 100% 40%);       /* ≈ ocean */
+  --primary-foreground:      hsl(0 0% 100%);
+  --secondary:               hsl(35 30% 85%);         /* warm sand */
+  --secondary-foreground:    hsl(222.2 47.4% 11.2%);
+  --muted:                   hsl(210 40% 96.1%);
+  --muted-foreground:        hsl(215.4 16.3% 46.9%);
+  --accent:                  hsl(45 100% 50%);        /* ≈ gold */
+  --accent-foreground:       hsl(222.2 47.4% 11.2%);
+  --destructive:             hsl(0 84.2% 60.2%);
+  --destructive-foreground:  hsl(210 40% 98%);
+  --border:                  hsl(214.3 31.8% 91.4%);
+  --input:                   hsl(214.3 31.8% 91.4%);
+  --ring:                    hsl(200 100% 40%);
+
+  /* Surface gradient anchors — the 3 radial glows on body bg */
+  --surface-a: hsl(196 100% 97%);
+  --surface-b: hsl(40 100% 97%);
+  --surface-c: hsl(170 65% 96%);
+
+  /* ----------------------------------------------------------------
+     TYPOGRAPHY
+     Display = Playfair (serif, editorial, romantic).
+     Body    = Inter (humanist sans, neutral workhorse).
+     ---------------------------------------------------------------- */
+  --font-display: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  /* Weight ramp */
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+
+  /* Type scale (px → rem assumes 16px root) */
+  --text-xs:   0.75rem;   /* 12 — micro, fine print */
+  --text-sm:   0.875rem;  /* 14 — UI, labels, nav */
+  --text-base: 1rem;      /* 16 — body */
+  --text-lg:   1.125rem;  /* 18 — lead body */
+  --text-xl:   1.25rem;   /* 20 — card title */
+  --text-2xl:  1.5rem;    /* 24 — h3 */
+  --text-3xl:  1.875rem;  /* 30 — h2 */
+  --text-4xl:  2.25rem;   /* 36 — hero small */
+  --text-5xl:  3rem;      /* 48 — hero mid */
+  --text-7xl:  4.5rem;    /* 72 — hero lg */
+  --text-8xl:  6rem;      /* 96 — hero xl (desktop) */
+
+  --lh-tight:   1.1;
+  --lh-snug:    1.25;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.7;
+
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.06em;
+
+  /* ----------------------------------------------------------------
+     SHAPE & ELEVATION
+     The site leans on generous radii (rounded-2xl / 3xl on cards,
+     rounded-full on pills) and soft, tinted ocean/gold shadows.
+     ---------------------------------------------------------------- */
+  --radius:      0.5rem;    /* shadcn default */
+  --radius-sm:   0.25rem;
+  --radius-md:   0.5rem;
+  --radius-lg:   1rem;
+  --radius-xl:   1.5rem;
+  --radius-2xl:  1.5rem;
+  --radius-3xl:  2rem;
+  --radius-pill: 9999px;
+
+  /* Shadows — soft & tinted, never neutral grey */
+  --shadow-sm:     0 1px 2px 0 rgba(15, 59, 87, 0.05);
+  --shadow-md:     0 4px 12px -2px rgba(15, 59, 87, 0.08);
+  --shadow-lg:     0 10px 30px -10px rgba(15, 59, 87, 0.15);
+  --shadow-xl:     0 20px 50px -15px rgba(15, 59, 87, 0.20);
+  --shadow-ocean:  0 8px 24px -12px rgba(0, 119, 190, 0.9);
+  --shadow-ocean-hover: 0 14px 32px -14px rgba(0, 119, 190, 0.95);
+  --shadow-gold:   0 12px 30px -12px rgba(255, 176, 0, 0.95);
+
+  /* ----------------------------------------------------------------
+     SPACING — Tailwind default (4px unit)
+     ---------------------------------------------------------------- */
+  --space-1:  0.25rem;   /* 4  */
+  --space-2:  0.5rem;    /* 8  */
+  --space-3:  0.75rem;   /* 12 */
+  --space-4:  1rem;      /* 16 */
+  --space-6:  1.5rem;    /* 24 */
+  --space-8:  2rem;      /* 32 */
+  --space-12: 3rem;      /* 48 */
+  --space-16: 4rem;      /* 64 */
+  --space-24: 6rem;      /* 96 */
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.25, 0.25, 0, 1);
+  --dur-fast:   150ms;
+  --dur-base:   300ms;
+  --dur-slow:   600ms;
+}
+
+/* ------------------------------------------------------------------
+   Semantic / element defaults — drop these on a page and it will
+   look reasonably on-brand out of the box.
+   ------------------------------------------------------------------ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  color: var(--foreground);
+  background: var(--background);
+  background-image:
+    radial-gradient(circle at 8% 15%, hsl(196 100% 97% / 0.85) 0%, transparent 48%),
+    radial-gradient(circle at 92% 12%, hsl(40 100% 97% / 0.75) 0%, transparent 44%),
+    radial-gradient(circle at 72% 92%, hsl(170 65% 96% / 0.65) 0%, transparent 46%);
+  background-attachment: fixed;
+}
+
+/* Display headings — Playfair, tight tracking, generous leading */
+h1, .h1 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: clamp(2.25rem, 4vw + 1rem, 6rem);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+h2, .h2 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.875rem, 2.5vw + 1rem, 3rem);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+h3, .h3 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-2xl);
+  line-height: var(--lh-snug);
+}
+h4, .h4 {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-xl);
+  line-height: var(--lh-snug);
+}
+
+/* Body / lead */
+p            { line-height: var(--lh-relaxed); max-width: 68ch; }
+.lead        { font-size: var(--text-lg); line-height: var(--lh-relaxed); color: hsl(215.4 16.3% 36%); }
+.eyebrow     { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--vo-ocean); }
+.quote       { font-family: var(--font-display); font-style: italic; font-size: var(--text-2xl); line-height: var(--lh-snug); color: var(--vo-ink-900); }
+
+/* Links */
+a            { color: var(--vo-ocean); text-decoration: none; transition: color var(--dur-base) var(--ease-standard); }
+a:hover      { color: var(--vo-ocean-dark); }

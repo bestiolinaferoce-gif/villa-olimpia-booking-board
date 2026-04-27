@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Villa Olimpia monogram">
+  
+  <circle cx="100" cy="100" r="90" fill="none" stroke="#0f3b57" stroke-width="1"></circle>
+  
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#0f3b57" stroke-width="0.6"></circle>
+
+  
+  <text x="100" y="120" text-anchor="middle" font-family="&#39;Playfair Display&#39;, &#39;Cormorant Garamond&#39;, &#39;Times New Roman&#39;, Georgia, serif" font-weight="400" font-size="92" fill="#0f3b57" letter-spacing="-2">V<tspan dx="0" dy="-8" font-size="14">·</tspan><tspan dx="0" dy="8">O</tspan></text>
+
+  
+  <text x="100" y="32" text-anchor="middle" font-family="&#39;Inter&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-weight="500" font-size="8" fill="#0f3b57" letter-spacing="3.5">EST · MMXX</text>
+  <text x="100" y="180" text-anchor="middle" font-family="&#39;Inter&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-weight="500" font-size="8" fill="#0f3b57" letter-spacing="3.5">CALABRIA</text>
+</svg>

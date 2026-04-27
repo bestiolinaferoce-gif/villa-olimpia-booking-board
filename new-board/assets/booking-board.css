@@ -1,0 +1,423 @@
+/* ================================================================
+   Villa Olimpia — Booking Board
+   Operative UI tokens, layered on top of the brand design system.
+   Inherits Inter + Playfair, palette anchored to navy / sand / sea.
+   ================================================================ */
+
+:root {
+  /* ----- Brand anchors (re-stated for clarity) ----- */
+  --vo-navy:        #0f3b57;
+  --vo-navy-deep:   #0a2a40;
+  --vo-navy-soft:   #1a4d6e;
+  --vo-ocean:       #0077BE;
+  --vo-ocean-light: #5aa8d4;
+  --vo-sea:         #4ba3c7;   /* azzurro mare per badge */
+  --vo-gold:        #c9a45c;   /* oro soft / sabbia */
+  --vo-gold-deep:   #a8843e;
+  --vo-sand:        #e8dcc4;
+  --vo-sand-light:  #f5ecd9;
+  --vo-cream:       #fbf7ef;   /* bianco caldo / avorio */
+  --vo-cream-deep:  #f4ecdc;
+  --vo-sage:        #7a9b7e;   /* verde salvia confermato */
+  --vo-sage-deep:   #5b7d61;
+  --vo-coral:       #c2604f;   /* corallo solo per alert/cancellazioni */
+  --vo-coral-soft:  #e8a597;
+  --vo-amber:       #c98a3a;   /* arancio tenue per attesa acconto */
+
+  /* ----- Operative neutrals (warm, not cold) ----- */
+  --bb-bg:          #faf6ee;   /* page bg, warm cream */
+  --bb-bg-2:        #f3ecdb;   /* secondary surface */
+  --bb-surface:     #ffffff;   /* card */
+  --bb-surface-2:   #fdfaf2;   /* card alt */
+  --bb-line:        #e6dcc6;   /* primary border, warm */
+  --bb-line-soft:   #efe7d2;   /* hairline */
+  --bb-line-strong: #d6c9a8;
+  --bb-ink:         #0f3b57;   /* primary text */
+  --bb-ink-2:       #2c4a63;   /* secondary text */
+  --bb-mute:        #6b7785;   /* muted */
+  --bb-mute-2:      #8a8474;   /* warm muted */
+
+  /* ----- Status palette (booking states) ----- */
+  --st-confirmed-bg:   #e8efe6;
+  --st-confirmed-fg:   #3e5e44;
+  --st-confirmed-bar:  #7a9b7e;
+  --st-confirmed-edge: #5b7d61;
+
+  --st-paid-bg:        #d7e7f3;
+  --st-paid-fg:        #0a3a5e;
+  --st-paid-bar:       #0f3b57;
+  --st-paid-edge:      #0a2a40;
+
+  --st-option-bg:      #f5e9cc;
+  --st-option-fg:      #6f5320;
+  --st-option-bar:     #c9a45c;
+  --st-option-edge:    #a8843e;
+
+  --st-quote-bg:       #dbe9ef;
+  --st-quote-fg:       #1f4a5e;
+  --st-quote-bar:      #4ba3c7;
+  --st-quote-edge:     #2f7a96;
+
+  --st-pending-bg:     #f3ddc1;
+  --st-pending-fg:     #7a4a18;
+  --st-pending-bar:    #c98a3a;
+  --st-pending-edge:   #9c6624;
+
+  --st-cancelled-bg:   #f5d9d2;
+  --st-cancelled-fg:   #6f2b1e;
+  --st-cancelled-bar:  #c2604f;
+  --st-cancelled-edge: #944231;
+
+  /* ----- Shape ----- */
+  --bb-r-sm:  6px;
+  --bb-r:     10px;
+  --bb-r-lg:  14px;
+  --bb-r-xl:  18px;
+
+  /* ----- Shadow (soft, tinted navy) ----- */
+  --bb-shadow-sm: 0 1px 2px rgba(15, 59, 87, 0.06);
+  --bb-shadow:    0 4px 12px -4px rgba(15, 59, 87, 0.10), 0 1px 2px rgba(15, 59, 87, 0.04);
+  --bb-shadow-lg: 0 18px 40px -20px rgba(15, 59, 87, 0.30), 0 2px 6px rgba(15, 59, 87, 0.06);
+  --bb-shadow-xl: 0 30px 70px -25px rgba(15, 59, 87, 0.40);
+
+  /* ----- Calendar density (overridden by Tweaks) ----- */
+  --cal-row-h:    44px;   /* row height, "comodo" */
+  --cal-col-w:    36px;   /* day column width */
+  --cal-bar-h:    34px;
+  --cal-bar-r:    7px;
+
+  /* ----- Type ----- */
+  --bb-num: 'Inter', system-ui, sans-serif;
+}
+
+/* ============ Density modes ============ */
+.bb[data-density="compact"] {
+  --cal-row-h: 36px;
+  --cal-col-w: 30px;
+  --cal-bar-h: 28px;
+  --cal-bar-r: 6px;
+}
+.bb[data-density="comfy"] {
+  --cal-row-h: 52px;
+  --cal-col-w: 42px;
+  --cal-bar-h: 40px;
+  --cal-bar-r: 8px;
+}
+
+/* ============ Dark navy operative variant ============ */
+.bb[data-theme="dark"] {
+  --bb-bg:        #0a1f30;
+  --bb-bg-2:      #0e2738;
+  --bb-surface:   #11304a;
+  --bb-surface-2: #143657;
+  --bb-line:      #1d4666;
+  --bb-line-soft: #163a55;
+  --bb-line-strong: #2a5a80;
+  --bb-ink:       #f3ecdb;
+  --bb-ink-2:     #c8d6e3;
+  --bb-mute:      #8aa3b8;
+  --bb-mute-2:    #7d8ea0;
+
+  /* Status — slightly desaturated for dark surface */
+  --st-confirmed-bg:   #1f3a26;
+  --st-confirmed-fg:   #c0d6c4;
+  --st-confirmed-bar:  #6a8a6e;
+  --st-confirmed-edge: #87a78b;
+
+  --st-paid-bg:        #163a5a;
+  --st-paid-fg:        #d2e6f5;
+  --st-paid-bar:       #2c6e9e;
+  --st-paid-edge:      #4a92c4;
+
+  --st-option-bg:      #4a3a18;
+  --st-option-fg:      #e8d9b4;
+  --st-option-bar:     #b89048;
+  --st-option-edge:    #d8b06c;
+
+  --st-quote-bg:       #1d4055;
+  --st-quote-fg":      #cfe3ec;
+  --st-quote-bg:       #1d4055;
+  --st-quote-fg:       #cfe3ec;
+  --st-quote-bar:      #3f8aae;
+  --st-quote-edge:     #6cb3d6;
+
+  --st-pending-bg:     #4a3018;
+  --st-pending-fg:     #e8c89a;
+  --st-pending-bar:    #b07530;
+  --st-pending-edge:   #d09956;
+
+  --st-cancelled-bg:   #4a201a;
+  --st-cancelled-fg:   #f0c8be;
+  --st-cancelled-bar:  #a04030;
+  --st-cancelled-edge: #c2604f;
+}
+
+/* ============ Base layout ============ */
+.bb {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bb-bg);
+  color: var(--bb-ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+  font-variant-numeric: tabular-nums;
+}
+
+.bb * {
+  box-sizing: border-box;
+}
+
+/* Scrollbar (subtle, warm) */
+.bb ::-webkit-scrollbar { width: 10px; height: 10px; }
+.bb ::-webkit-scrollbar-track { background: transparent; }
+.bb ::-webkit-scrollbar-thumb { background: var(--bb-line); border-radius: 10px; border: 2px solid var(--bb-bg); }
+.bb ::-webkit-scrollbar-thumb:hover { background: var(--bb-line-strong); }
+
+/* ============ Typography helpers ============ */
+.bb-display {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--bb-ink);
+}
+.bb-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vo-ocean);
+}
+.bb[data-theme="dark"] .bb-eyebrow { color: var(--vo-gold); }
+
+.bb-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ============ Buttons ============ */
+.bb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: var(--bb-r);
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.25, 0.25, 0, 1);
+  white-space: nowrap;
+  background: transparent;
+  color: var(--bb-ink);
+  font-family: inherit;
+}
+.bb-btn:hover { transform: translateY(-1px); }
+.bb-btn:active { transform: translateY(0); }
+
+.bb-btn--primary {
+  background: var(--vo-navy);
+  color: var(--vo-cream);
+  box-shadow: 0 4px 12px -4px rgba(15, 59, 87, 0.4);
+}
+.bb-btn--primary:hover { background: var(--vo-navy-deep); box-shadow: 0 8px 18px -6px rgba(15, 59, 87, 0.5); }
+
+.bb-btn--gold {
+  background: linear-gradient(180deg, #d4b06f, var(--vo-gold));
+  color: #2c1f0a;
+  box-shadow: 0 4px 12px -4px rgba(168, 132, 62, 0.5);
+  border-color: var(--vo-gold-deep);
+}
+.bb-btn--gold:hover { filter: brightness(1.05); }
+
+.bb-btn--ghost {
+  background: transparent;
+  color: var(--bb-ink);
+  border-color: var(--bb-line);
+}
+.bb-btn--ghost:hover { background: var(--bb-surface); border-color: var(--bb-line-strong); }
+
+.bb-btn--quiet {
+  background: transparent;
+  color: var(--bb-ink-2);
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.bb-btn--quiet:hover { background: var(--bb-bg-2); }
+
+.bb-btn--sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.bb-btn--icon { width: 38px; padding: 0; justify-content: center; }
+.bb-btn--icon.bb-btn--sm { width: 30px; height: 30px; }
+
+/* Danger */
+.bb-btn--danger {
+  background: transparent;
+  color: var(--vo-coral);
+  border-color: rgba(194, 96, 79, 0.3);
+}
+.bb-btn--danger:hover { background: rgba(194, 96, 79, 0.08); }
+
+/* ============ Cards ============ */
+.bb-card {
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-r-lg);
+  box-shadow: var(--bb-shadow-sm);
+}
+.bb-card--padded { padding: 20px; }
+.bb-card--lift { box-shadow: var(--bb-shadow); }
+
+/* ============ Badges ============ */
+.bb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.bb-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.bb-badge--confirmed { background: var(--st-confirmed-bg); color: var(--st-confirmed-fg); }
+.bb-badge--paid      { background: var(--st-paid-bg);      color: var(--st-paid-fg); }
+.bb-badge--option    { background: var(--st-option-bg);    color: var(--st-option-fg); }
+.bb-badge--quote     { background: var(--st-quote-bg);     color: var(--st-quote-fg); }
+.bb-badge--pending   { background: var(--st-pending-bg);   color: var(--st-pending-fg); }
+.bb-badge--cancelled { background: var(--st-cancelled-bg); color: var(--st-cancelled-fg); }
+.bb-badge--premium {
+  background: linear-gradient(180deg, #f5e0a8, var(--vo-gold));
+  color: #4a3508;
+  border: 1px solid var(--vo-gold-deep);
+  font-weight: 700;
+}
+.bb-badge--neutral { background: var(--bb-bg-2); color: var(--bb-ink-2); border: 1px solid var(--bb-line); }
+
+/* ============ Inputs ============ */
+.bb-input, .bb-select, .bb-textarea {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-r);
+  background: var(--bb-surface);
+  color: var(--bb-ink);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.bb-textarea { height: auto; padding: 10px 12px; resize: vertical; min-height: 80px; }
+.bb-input:focus, .bb-select:focus, .bb-textarea:focus {
+  outline: none;
+  border-color: var(--vo-ocean);
+  box-shadow: 0 0 0 3px rgba(0, 119, 190, 0.12);
+}
+.bb-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bb-ink-2);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+/* ============ Calendar bars ============ */
+.bb-bar {
+  height: var(--cal-bar-h);
+  border-radius: var(--cal-bar-r);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: filter 150ms, transform 150ms, box-shadow 150ms;
+  position: relative;
+  user-select: none;
+}
+.bb-bar:hover { filter: brightness(0.97); transform: translateY(-1px); box-shadow: 0 6px 14px -6px rgba(15, 59, 87, 0.4); z-index: 5; }
+
+/* Bar styles by Tweak */
+.bb[data-bar-style="filled"] .bb-bar { /* default */ }
+.bb[data-bar-style="bordered"] .bb-bar {
+  background: var(--bb-surface) !important;
+  color: var(--bb-ink) !important;
+  border: 2px solid var(--_edge);
+  border-left: 4px solid var(--_edge);
+}
+.bb[data-bar-style="minimal"] .bb-bar {
+  background: transparent !important;
+  color: var(--bb-ink) !important;
+  border-left: 3px solid var(--_edge);
+  border-radius: 0;
+  box-shadow: inset 0 -1px 0 var(--bb-line-soft);
+}
+.bb[data-bar-style="minimal"] .bb-bar:hover { background: var(--bb-surface) !important; }
+
+/* Hide amounts when tweak is off */
+.bb[data-amounts="hide"] .bb-bar__amount { display: none; }
+.bb[data-amounts="hide"] .bb-bar__channel-sep { display: none; }
+
+/* ============ Status bar fills ============ */
+.bb-bar--confirmed { background: var(--st-confirmed-bar); color: #fff; --_edge: var(--st-confirmed-edge); }
+.bb-bar--paid      { background: var(--st-paid-bar);      color: #fff; --_edge: var(--st-paid-edge); }
+.bb-bar--option    { background: var(--st-option-bar);    color: #2c1f08; --_edge: var(--st-option-edge); }
+.bb-bar--quote     { background: var(--st-quote-bar);     color: #fff; --_edge: var(--st-quote-edge); }
+.bb-bar--pending   { background: var(--st-pending-bar);   color: #fff; --_edge: var(--st-pending-edge); }
+.bb-bar--cancelled {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--st-cancelled-bar) 0,
+    var(--st-cancelled-bar) 6px,
+    rgba(255,255,255,0.3) 6px,
+    rgba(255,255,255,0.3) 10px
+  );
+  color: #fff;
+  --_edge: var(--st-cancelled-edge);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.85;
+}
+
+/* ============ Utility ============ */
+.bb-hr { height: 1px; background: var(--bb-line); border: 0; margin: 16px 0; }
+
+.bb-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bb-bg-2);
+  border: 1px solid var(--bb-line);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--bb-mute);
+  font-family: 'Inter', monospace;
+}
+
+/* ============ Animations ============ */
+@keyframes bb-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.bb-pulse { animation: bb-pulse 1.6s ease-in-out infinite; }
+
+@keyframes bb-spin {
+  to { transform: rotate(360deg); }
+}
+.bb-spin { animation: bb-spin 0.9s linear infinite; }
+
+/* Print */
+@media print {
+  .bb-no-print { display: none !important; }
+}

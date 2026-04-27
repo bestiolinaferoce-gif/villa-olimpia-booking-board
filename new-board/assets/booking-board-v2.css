@@ -1,0 +1,534 @@
+/* ================================================================
+   Villa Olimpia — Booking Board v2 · Design Tokens
+   Ridisegno premium. Estende booking-board.css aggiungendo:
+   - tokens semantici puliti (per export Tailwind)
+   - stati bottoni completi (normale/hover/active/disabled/loading/error/in-dev)
+   - widget shells (KPI, Revenue Opp, Smart Follow-up, Weather, Flights)
+   - micro-componenti (segmented control, sparkline shell, kbd)
+   ================================================================ */
+
+:root {
+  /* ----- Brand semantic ramp v2 (mediterranean ops console) ----- */
+  --v2-navy-900: #0a1f30;
+  --v2-navy-800: #0f3b57;   /* primary navy */
+  --v2-navy-700: #1a4d6e;
+  --v2-navy-600: #2a6691;
+
+  --v2-sand-50:  #fbf7ee;   /* page bg light */
+  --v2-sand-100: #f5ecd9;
+  --v2-sand-200: #e8dcc4;
+  --v2-sand-300: #d6c9a8;
+
+  --v2-gold-300: #d8b06c;
+  --v2-gold-500: #c9a45c;   /* premium */
+  --v2-gold-700: #a8843e;
+
+  --v2-sea-300:  #7fbfd9;
+  --v2-sea-500:  #4ba3c7;
+  --v2-sea-700:  #2f7a96;
+
+  --v2-sage-300: #a4bfa8;
+  --v2-sage-500: #7a9b7e;
+  --v2-sage-700: #5b7d61;
+
+  --v2-coral-500:#c2604f;   /* alert only */
+  --v2-amber-500:#c98a3a;   /* warning */
+
+  /* ----- Stati bottoni — focus ring shared ----- */
+  --v2-focus-ring: 0 0 0 3px rgba(0, 119, 190, 0.22);
+}
+
+/* ============================================================
+   STATI BOTTONI COMPLETI (handoff-ready)
+   Ogni stato ha colori espliciti: normale / hover / active /
+   focus / disabled / loading / error / in-dev (futuro).
+   Esposti come classi modificatrici di .bb-btn (già definito).
+   ============================================================ */
+.bb-btn:focus-visible { outline: none; box-shadow: var(--v2-focus-ring); }
+.bb-btn[disabled],
+.bb-btn--disabled {
+  cursor: not-allowed !important;
+  opacity: 0.45;
+  filter: grayscale(0.2);
+  transform: none !important;
+  box-shadow: none !important;
+}
+.bb-btn--loading {
+  pointer-events: none;
+  position: relative;
+  color: transparent !important;
+}
+.bb-btn--loading::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: bb-spin 0.7s linear infinite;
+  color: var(--vo-cream);
+}
+.bb-btn--primary.bb-btn--loading::after { color: var(--vo-cream); }
+.bb-btn--ghost.bb-btn--loading::after,
+.bb-btn--quiet.bb-btn--loading::after { color: var(--bb-ink); }
+
+.bb-btn--error {
+  background: rgba(194, 96, 79, 0.10) !important;
+  color: var(--vo-coral) !important;
+  border: 1px solid var(--vo-coral) !important;
+  animation: bb-shake 0.4s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes bb-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
+}
+
+/* "in-dev" — funzione futura, UI credibile ma chiaramente bloccata */
+.bb-btn--indev {
+  position: relative;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bb-bg-2) 0 6px,
+    var(--bb-surface) 6px 12px
+  ) !important;
+  color: var(--bb-mute) !important;
+  border: 1px dashed var(--bb-line-strong) !important;
+  cursor: help !important;
+}
+.bb-btn--indev::before {
+  content: 'in dev';
+  position: absolute; top: -7px; right: -4px;
+  font-size: 9px; font-weight: 700;
+  background: var(--vo-gold-deep); color: var(--vo-cream);
+  padding: 1px 5px; border-radius: 3px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+
+/* Success transient */
+.bb-btn--success {
+  background: var(--vo-sage-deep) !important;
+  color: var(--vo-cream) !important;
+  border-color: var(--vo-sage-deep) !important;
+}
+.bb-btn--success::after {
+  content: '✓'; margin-left: 6px; font-weight: 700;
+}
+
+/* ============================================================
+   SEGMENTED CONTROL (filtri, switch viste)
+   ============================================================ */
+.v2-seg {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--bb-bg-2);
+  border-radius: 8px;
+  border: 1px solid var(--bb-line);
+  gap: 2px;
+}
+.v2-seg__item {
+  padding: 6px 12px;
+  font-size: 12px; font-weight: 600;
+  color: var(--bb-ink-2);
+  background: transparent;
+  border: 0; border-radius: 6px;
+  cursor: pointer; font-family: inherit;
+  transition: all 150ms;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.v2-seg__item:hover { color: var(--bb-ink); background: rgba(15, 59, 87, 0.04); }
+.v2-seg__item[data-active="true"] {
+  background: var(--bb-surface);
+  color: var(--bb-ink);
+  box-shadow: 0 1px 2px rgba(15, 59, 87, 0.08), 0 0 0 1px var(--bb-line);
+}
+.bb[data-theme="dark"] .v2-seg__item[data-active="true"] {
+  background: var(--vo-navy-soft);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 0 0 1px var(--bb-line-strong);
+}
+
+/* ============================================================
+   STAT CARD v2 (più ricca della v1)
+   ============================================================ */
+.v2-stat {
+  position: relative;
+  padding: 16px 18px;
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.v2-stat__icon {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+}
+.v2-stat__label {
+  font-size: 11px; font-weight: 600;
+  color: var(--bb-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.v2-stat__value {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 30px; font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--bb-ink);
+  line-height: 1;
+}
+.v2-stat__sub {
+  font-size: 12px;
+  color: var(--bb-mute);
+  margin-top: 4px;
+}
+.v2-stat__delta {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  margin-left: 6px;
+}
+.v2-stat__delta--up   { background: rgba(122,155,126,0.15); color: var(--vo-sage-deep); }
+.v2-stat__delta--down { background: rgba(194,96,79,0.12);   color: var(--vo-coral); }
+.v2-stat__sparkline {
+  position: absolute; right: 12px; bottom: 12px;
+  width: 80px; height: 28px; opacity: 0.6;
+}
+
+/* ============================================================
+   WIDGET SHELL (Revenue Opp, Smart Follow-up, Weather, Flights)
+   Tono operativo: header con eyebrow + titolo + meta destra,
+   contenuto scrollabile, footer azione opzionale.
+   ============================================================ */
+.v2-widget {
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-line);
+  border-radius: 14px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.v2-widget__head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--bb-line-soft);
+}
+.v2-widget__head-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.v2-widget__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 16px; font-weight: 700;
+  margin: 0; color: var(--bb-ink);
+  letter-spacing: -0.01em;
+}
+.v2-widget__sub {
+  font-size: 11.5px;
+  color: var(--bb-mute);
+  margin-top: 1px;
+}
+.v2-widget__body { padding: 12px 16px; flex: 1; }
+.v2-widget__body--flush { padding: 0; }
+.v2-widget__foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--bb-line-soft);
+  background: var(--bb-bg);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+}
+
+/* List item dentro widget */
+.v2-li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  transition: background 150ms;
+  cursor: pointer;
+}
+.v2-li:hover { background: var(--bb-bg); }
+.v2-li__title { font-size: 13px; font-weight: 600; color: var(--bb-ink); }
+.v2-li__sub { font-size: 11.5px; color: var(--bb-mute); margin-top: 1px; }
+.v2-li__amount { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--bb-ink); }
+
+/* Severity dots */
+.v2-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.v2-dot--hot   { background: var(--vo-coral); box-shadow: 0 0 0 3px rgba(194,96,79,0.18); }
+.v2-dot--warn  { background: var(--vo-amber); box-shadow: 0 0 0 3px rgba(201,138,58,0.18); }
+.v2-dot--info  { background: var(--vo-sea);   box-shadow: 0 0 0 3px rgba(75,163,199,0.18); }
+.v2-dot--ok    { background: var(--vo-sage-deep); box-shadow: 0 0 0 3px rgba(122,155,126,0.20); }
+
+/* ============================================================
+   WEATHER CARD
+   ============================================================ */
+.v2-weather {
+  display: grid; grid-template-columns: auto 1fr; gap: 14px;
+  align-items: center;
+}
+.v2-weather__big {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 44px; font-weight: 700;
+  line-height: 1; color: var(--bb-ink);
+  letter-spacing: -0.03em;
+}
+.v2-weather__big sup { font-size: 18px; font-weight: 400; color: var(--bb-mute); margin-left: 2px; }
+.v2-weather__cond { font-size: 12.5px; color: var(--bb-ink-2); }
+.v2-weather__forecast {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  margin-top: 12px;
+}
+.v2-weather__day {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: var(--bb-bg-2);
+}
+.v2-weather__day-label { font-size: 10px; color: var(--bb-mute); text-transform: uppercase; font-weight: 600; }
+.v2-weather__day-temp { font-size: 13px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   PILL (filtri, chip)
+   ============================================================ */
+.v2-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  background: var(--bb-bg-2);
+  border: 1px solid var(--bb-line);
+  border-radius: 999px;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--bb-ink-2);
+  cursor: pointer; font-family: inherit;
+  transition: all 150ms;
+}
+.v2-pill:hover { background: var(--bb-surface); color: var(--bb-ink); }
+.v2-pill[data-active="true"] {
+  background: var(--vo-navy);
+  color: var(--vo-cream);
+  border-color: var(--vo-navy);
+}
+.v2-pill__x {
+  display: inline-flex; opacity: 0.6;
+  margin-left: 2px;
+}
+.v2-pill:hover .v2-pill__x { opacity: 1; }
+
+/* ============================================================
+   STATUS LINE (saving / saved / error) full row variant
+   ============================================================ */
+.v2-status-line {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+}
+.v2-status-line--saved   { background: rgba(122,155,126,0.10); color: var(--vo-sage-deep); }
+.v2-status-line--saving  { background: rgba(0,119,190,0.10);   color: var(--vo-ocean); }
+.v2-status-line--unsaved { background: rgba(201,138,58,0.12);  color: var(--vo-amber); }
+.v2-status-line--error   { background: rgba(194,96,79,0.10);   color: var(--vo-coral); }
+
+/* ============================================================
+   PROGRESS BAR (occupazione, conversion)
+   ============================================================ */
+.v2-progress {
+  height: 6px; border-radius: 3px;
+  background: var(--bb-bg-2);
+  overflow: hidden;
+}
+.v2-progress__fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--vo-ocean), var(--vo-sea));
+  transition: width 600ms cubic-bezier(0.25, 0.25, 0, 1);
+}
+.v2-progress--gold .v2-progress__fill {
+  background: linear-gradient(90deg, var(--vo-gold-deep), var(--vo-gold));
+}
+.v2-progress--sage .v2-progress__fill {
+  background: linear-gradient(90deg, var(--vo-sage-deep), var(--vo-sage));
+}
+
+/* ============================================================
+   COPY-TO-CLIPBOARD CARD (WhatsApp Assistant)
+   ============================================================ */
+.v2-copy-card {
+  position: relative;
+  padding: 12px 14px;
+  background: var(--bb-bg);
+  border: 1px solid var(--bb-line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--bb-ink-2);
+  font-family: 'Inter', sans-serif;
+  white-space: pre-wrap;
+}
+.v2-copy-card__lbl {
+  position: absolute; top: -8px; left: 10px;
+  background: var(--bb-surface);
+  padding: 0 6px;
+  font-size: 10px; font-weight: 700;
+  color: var(--bb-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.v2-copy-card__btn {
+  position: absolute; top: 8px; right: 8px;
+}
+
+/* ============================================================
+   TIMELINE ITEM (Booking Detail history)
+   ============================================================ */
+.v2-tl { position: relative; padding-left: 22px; }
+.v2-tl::before {
+  content: ''; position: absolute;
+  left: 6px; top: 6px; bottom: 0;
+  width: 1px; background: var(--bb-line);
+}
+.v2-tl__item { position: relative; padding-bottom: 14px; }
+.v2-tl__item::before {
+  content: ''; position: absolute;
+  left: -19px; top: 5px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--bb-surface);
+  border: 2px solid var(--vo-ocean);
+}
+.v2-tl__item[data-kind="paid"]::before  { border-color: var(--vo-sage-deep); }
+.v2-tl__item[data-kind="alert"]::before { border-color: var(--vo-coral); }
+.v2-tl__item[data-kind="note"]::before  { border-color: var(--bb-mute); }
+.v2-tl__when { font-size: 10.5px; color: var(--bb-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.v2-tl__what { font-size: 13px; color: var(--bb-ink); font-weight: 500; margin-top: 1px; }
+
+/* ============================================================
+   THEME PREVIEW SWATCH (Settings page)
+   ============================================================ */
+.v2-theme-card {
+  position: relative;
+  border: 1px solid var(--bb-line);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 200ms;
+}
+.v2-theme-card:hover { transform: translateY(-2px); box-shadow: var(--bb-shadow); }
+.v2-theme-card[data-active="true"] {
+  border-color: var(--vo-ocean);
+  box-shadow: 0 0 0 3px rgba(0,119,190,0.15);
+}
+.v2-theme-card__preview {
+  height: 80px;
+  display: grid; grid-template-columns: 30% 1fr;
+}
+.v2-theme-card__name {
+  padding: 10px 12px;
+  font-size: 13px; font-weight: 600;
+  background: var(--bb-surface);
+  border-top: 1px solid var(--bb-line);
+}
+
+/* ============================================================
+   ATTACHMENT THUMB (Quote Studio)
+   ============================================================ */
+.v2-thumb {
+  position: relative;
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bb-bg-2);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 150ms;
+}
+.v2-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v2-thumb:hover { border-color: var(--vo-ocean); }
+.v2-thumb[data-selected="true"] {
+  border-color: var(--vo-ocean);
+  box-shadow: 0 0 0 2px rgba(0,119,190,0.2);
+}
+.v2-thumb[data-selected="true"]::after {
+  content: '✓'; position: absolute; top: 4px; right: 4px;
+  width: 18px; height: 18px;
+  background: var(--vo-ocean); color: white;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+}
+.v2-thumb__lbl {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  color: white;
+  padding: 12px 8px 6px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.v2-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+.v2-empty__icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: var(--bb-bg-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  color: var(--bb-mute);
+}
+.v2-empty__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 20px; font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--bb-ink);
+}
+.v2-empty__sub { font-size: 13px; color: var(--bb-mute); max-width: 380px; margin: 0 auto; }
+
+/* ============================================================
+   KEYBOARD HINT (operative pages)
+   ============================================================ */
+.v2-kbd-hint {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; color: var(--bb-mute);
+}
+
+/* ============================================================
+   TAB BAR (Booking Detail, Quote Studio)
+   ============================================================ */
+.v2-tabs {
+  display: flex; gap: 2px;
+  border-bottom: 1px solid var(--bb-line);
+  padding: 0 4px;
+}
+.v2-tabs__item {
+  padding: 10px 14px;
+  background: transparent; border: 0;
+  font-size: 13px; font-weight: 600;
+  color: var(--bb-mute);
+  cursor: pointer; font-family: inherit;
+  position: relative;
+  transition: color 150ms;
+}
+.v2-tabs__item:hover { color: var(--bb-ink-2); }
+.v2-tabs__item[data-active="true"] {
+  color: var(--bb-ink);
+}
+.v2-tabs__item[data-active="true"]::after {
+  content: ''; position: absolute;
+  bottom: -1px; left: 4px; right: 4px; height: 2px;
+  background: var(--vo-ocean);
+  border-radius: 2px 2px 0 0;
+}
+.v2-tabs__count {
+  margin-left: 5px;
+  font-size: 10px; font-weight: 700;
+  background: var(--bb-bg-2);
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: var(--bb-ink-2);
+}
+
+/* Print refinements */
+@media print {
+  .v2-widget, .v2-stat { box-shadow: none !important; border-color: #ccc !important; }
+}

@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Villa Olimpia · Booking Board</title>
+<meta name="viewport" content="width=1440"/>
+<link rel="icon" href="assets/monogram.svg"/>
+<link rel="stylesheet" href="assets/colors_and_type.css"/>
+<link rel="stylesheet" href="assets/booking-board.css"/>
+<link rel="stylesheet" href="assets/booking-board-v2.css"/>
+<style>
+  body { margin: 0; }
+  .app-shell { display: flex; min-height: 100vh; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .content-wrap { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+  .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; }
+  @media (max-width: 1280px) { .dashboard-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="shell.jsx"></script>
+<script type="text/babel" src="gantt.jsx"></script>
+<script type="text/babel" src="panels.jsx"></script>
+<script type="text/babel" src="forms-and-views.jsx"></script>
+<script type="text/babel" src="widgets-v2.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "density": "compact",
+  "theme": "dark",
+  "barStyle": "filled",
+  "amounts": "show",
+  "calView": "month",
+  "lang": "it"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const [active, setActive] = useState('dashboard');
+  const [collapsed, setCollapsed] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('saved');
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  // Salva su localStorage e aggiorna l'indicatore
+  const triggerSave = () => {
+    setSaveStatus('saving');
+    window.BB_SAVE();
+    setTimeout(() => setSaveStatus('saved'), 800);
+  };
+
+  const lang = tweaks.lang;
+
+  return (
+    <div className="bb"
+         data-density={tweaks.density}
+         data-theme={tweaks.theme}
+         data-bar-style={tweaks.barStyle}
+         data-amounts={tweaks.amounts}>
+      <window.BBHeader
+        saveStatus={saveStatus}
+        onNew={() => setShowForm(true)}
+        onQuote={() => setActive('quotes')}
+        onPrint={() => window.print()}
+        onExport={triggerSave}
+        lang={lang}
+        view={active}
+        setView={setActive}
+        locale={lang}
+      />
+      <div className="app-shell">
+        <window.BBSidebar
+          active={active}
+          onNav={setActive}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(c => !c)}
+          lang={lang}
+        />
+        <main className="main">
+          <div className="content-wrap">
+            {active === 'dashboard' && (
+              <DashboardView
+                lang={lang}
+                tweaks={tweaks}
+                monthOffset={monthOffset}
+                setMonthOffset={setMonthOffset}
+                onSelectBooking={setSelectedBooking}
+              />
+            )}
+            {active === 'calendar' && (
+              <CalendarView
+                lang={lang} tweaks={tweaks} setTweak={setTweak}
+                monthOffset={monthOffset} setMonthOffset={setMonthOffset}
+                onSelectBooking={setSelectedBooking}
+              />
+            )}
+            {active === 'today' && (
+              <TodayView lang={lang} onSelectBooking={setSelectedBooking}/>
+            )}
+            {active === 'bookings' && (
+              <BookingsListView lang={lang} onSelectBooking={setSelectedBooking}/>
+            )}
+            {active === 'quotes' && <window.BBQuotesView lang={lang} onPreview={() => {}}/>}
+            {active === 'lodges' && <window.BBLodgesView lang={lang} onSelectBooking={setSelectedBooking}/>}
+            {active === 'settings' && (
+              <>
+                <div data-screen-label="08 Settings · button states">
+                  <div className="bb-eyebrow">{lang==='en'?'Design system':'Design system'}</div>
+                  <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 12px' }}>{lang==='en'?'Button states · handoff':'Stati bottoni · handoff'}</h1>
+                </div>
+                <window.V2ButtonStates lang={lang}/>
+              </>
+            )}
+            {!['dashboard','calendar','today','bookings','quotes','lodges','settings'].includes(active) && (
+              <PlaceholderView active={active} lang={lang}/>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {selectedBooking && <window.BBBookingModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} lang={lang}/>}
+      {showForm && <window.BBBookingForm onClose={() => setShowForm(false)} lang={lang}/>}
+
+      {/* Tweaks panel */}
+      <window.TweaksPanel title="Tweaks">
+        <window.TweakSection title={lang==='en'?'Calendar':'Calendario'}>
+          <window.TweakRadio label={lang==='en'?'Density':'Densità'} value={tweaks.density} options={[
+            { value: 'compact', label: lang==='en'?'Compact':'Compatto' },
+            { value: 'comfy',   label: lang==='en'?'Comfy':'Comodo' },
+          ]} onChange={v => setTweak('density', v)}/>
+          <window.TweakRadio label={lang==='en'?'View':'Vista'} value={tweaks.calView} options={[
+            { value: 'month',     label: lang==='en'?'Month':'Mese' },
+            { value: 'fortnight', label: lang==='en'?'2 weeks':'2 sett.' },
+            { value: 'week',      label: lang==='en'?'Week':'Settimana' },
+          ]} onChange={v => setTweak('calView', v)}/>
+          <window.TweakRadio label={lang==='en'?'Bar style':'Stile barre'} value={tweaks.barStyle} options={[
+            { value: 'filled',   label: lang==='en'?'Filled':'Piene' },
+            { value: 'bordered', label: lang==='en'?'Bordered':'Bordo' },
+            { value: 'minimal',  label: 'Minimal' },
+          ]} onChange={v => setTweak('barStyle', v)}/>
+          <window.TweakRadio label={lang==='en'?'Show amounts':'Importi sulle barre'} value={tweaks.amounts} options={[
+            { value: 'show', label: lang==='en'?'Show':'Mostra' },
+            { value: 'hide', label: lang==='en'?'Hide':'Nascondi' },
+          ]} onChange={v => setTweak('amounts', v)}/>
+        </window.TweakSection>
+        <window.TweakSection title={lang==='en'?'Appearance':'Aspetto'}>
+          <window.TweakRadio label={lang==='en'?'Theme':'Tema'} value={tweaks.theme} options={[
+            { value: 'light', label: lang==='en'?'Light':'Chiaro' },
+            { value: 'dark',  label: lang==='en'?'Dark navy':'Navy operativo' },
+          ]} onChange={v => setTweak('theme', v)}/>
+          <window.TweakRadio label={lang==='en'?'Language':'Lingua'} value={tweaks.lang} options={[
+            { value: 'it', label: 'IT' }, { value: 'en', label: 'EN' },
+          ]} onChange={v => setTweak('lang', v)}/>
+        </window.TweakSection>
+        <window.TweakSection title={lang==='en'?'Data':'Dati'}>
+          <window.TweakButton label={lang==='en'?'Save now':'Salva ora'} onClick={() => { window.BB_SAVE(); setSaveStatus('saving'); setTimeout(() => setSaveStatus('saved'), 800); }}/>
+          <window.TweakButton label={lang==='en'?'Reset to seed data':'Ripristina dati originali'} onClick={() => { if(confirm('Ripristinare i 50 booking originali? Tutte le modifiche saranno perse.')) window.BB_RESET(); }}/>
+        </window.TweakSection>
+      </window.TweaksPanel>
+    </div>
+  );
+}
+
+// ============== DASHBOARD VIEW ==============
+function DashboardView({ lang, tweaks, monthOffset, setMonthOffset, onSelectBooking }) {
+  const today = window.TODAY;
+  return (
+    <>
+      {/* Page title */}
+      <div data-screen-label="01 Dashboard" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 }}>
+        <div>
+          <div className="bb-eyebrow">{lang==='en'?'Operations':'Operativo'}</div>
+          <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 0', letterSpacing: '-0.02em' }}>
+            {lang==='en'?'Dashboard':'Dashboard'} <span style={{ color: 'var(--bb-mute)', fontWeight: 400, fontStyle: 'italic', fontSize: 22 }}>· estate 2026</span>
+          </h1>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="bb-btn bb-btn--ghost"><window.IconRefresh size={14}/> {lang==='en'?'Sync':'Sincronizza'}</button>
+        </div>
+      </div>
+
+      <window.BBKpiStrip lang={lang}/>
+
+      {/* v2 premium row — sopra il calendario */}
+      <window.V2Dashboard lang={lang} onAction={()=>{}}/>
+
+      <div className="dashboard-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Calendar header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 className="bb-display" style={{ fontSize: 20, margin: 0 }}>{lang==='en'?'Booking calendar':'Calendario prenotazioni'}</h2>
+            <span style={{ fontSize: 11.5, color: 'var(--bb-mute)' }}>· {lang==='en'?'9 lodges · click any bar to see details, dashed gaps are sellable nights':'9 lodge · clicca una barra per i dettagli, i tratteggi sono notti libere da vendere'}</span>
+            <span style={{ flex: 1 }}/>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, background: 'var(--bb-bg-2)', borderRadius: 8 }}>
+              <button className="bb-btn bb-btn--quiet bb-btn--icon bb-btn--sm" onClick={() => setMonthOffset(o => o-1)}><window.IconChevLeft size={13}/></button>
+              <span style={{ fontSize: 12.5, fontWeight: 600, padding: '0 12px', textTransform: 'capitalize' }}>
+                {new Date(window.CURRENT_MONTH.year, window.CURRENT_MONTH.month+monthOffset, 1).toLocaleDateString(lang==='en'?'en-GB':'it-IT', { month: 'long', year: 'numeric' })}
+              </span>
+              <button className="bb-btn bb-btn--quiet bb-btn--icon bb-btn--sm" onClick={() => setMonthOffset(o => o+1)}><window.IconChevRight size={13}/></button>
+            </div>
+            <button className="bb-btn bb-btn--ghost bb-btn--sm" onClick={() => setMonthOffset(0)}>{lang==='en'?'Today':'Oggi'}</button>
+          </div>
+
+          <window.BBGantt
+            view={tweaks.calView}
+            monthOffset={monthOffset}
+            onSelectBooking={onSelectBooking}
+            onSelectGap={(g) => alert(`${lang==='en'?'Sell this gap':'Vendi questo buco'}: ${window.LODGES.find(l=>l.id===g.lodge).name} · ${g.days} ${lang==='en'?'nights':'notti'}`)}
+            lang={lang}
+          />
+        </div>
+
+        <window.BBTodayPanel lang={lang} onSelectBooking={onSelectBooking}/>
+      </div>
+    </>
+  );
+}
+
+// ============== CALENDAR VIEW (extended) ==============
+function CalendarView({ lang, tweaks, setTweak, monthOffset, setMonthOffset, onSelectBooking }) {
+  return (
+    <>
+      <div data-screen-label="02 Calendar">
+        <div className="bb-eyebrow">{lang==='en'?'Operations':'Operativo'}</div>
+        <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 12px' }}>{lang==='en'?'Booking calendar':'Calendario prenotazioni'}</h1>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, background: 'var(--bb-bg-2)', borderRadius: 8 }}>
+          <button className="bb-btn bb-btn--quiet bb-btn--icon bb-btn--sm" onClick={() => setMonthOffset(o => o-1)}><window.IconChevLeft size={13}/></button>
+          <span style={{ fontSize: 12.5, fontWeight: 600, padding: '0 12px', textTransform: 'capitalize' }}>
+            {new Date(window.CURRENT_MONTH.year, window.CURRENT_MONTH.month+monthOffset, 1).toLocaleDateString(lang==='en'?'en-GB':'it-IT', { month: 'long', year: 'numeric' })}
+          </span>
+          <button className="bb-btn bb-btn--quiet bb-btn--icon bb-btn--sm" onClick={() => setMonthOffset(o => o+1)}><window.IconChevRight size={13}/></button>
+        </div>
+        <button className="bb-btn bb-btn--ghost bb-btn--sm" onClick={() => setMonthOffset(0)}>{lang==='en'?'Today':'Oggi'}</button>
+        <span style={{ flex: 1 }}/>
+        <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bb-bg-2)', borderRadius: 8 }}>
+          {[['month',lang==='en'?'Month':'Mese'],['fortnight',lang==='en'?'2 weeks':'2 sett.'],['week',lang==='en'?'Week':'Settimana']].map(([k,lbl]) => (
+            <button key={k} onClick={() => setTweak('calView', k)}
+              className={`bb-btn ${tweaks.calView===k?'bb-btn--primary':'bb-btn--quiet'} bb-btn--sm`}
+              style={{padding:'0 12px'}}>{lbl}</button>
+          ))}
+        </div>
+      </div>
+      <window.BBGantt
+        view={tweaks.calView}
+        monthOffset={monthOffset}
+        onSelectBooking={onSelectBooking}
+        onSelectGap={()=>{}}
+        lang={lang}
+      />
+    </>
+  );
+}
+
+// ============== TODAY VIEW ==============
+function TodayView({ lang, onSelectBooking }) {
+  return (
+    <>
+      <div data-screen-label="03 Today">
+        <div className="bb-eyebrow">{lang==='en'?'Daily ops':'Operazioni del giorno'}</div>
+        <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 12px', textTransform: 'capitalize' }}>
+          {window.TODAY.toLocaleDateString(lang==='en'?'en-GB':'it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </h1>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <window.BBTodayPanel lang={lang} onSelectBooking={onSelectBooking}/>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="bb-card" style={{ padding: 18 }}>
+            <h3 className="bb-display" style={{ fontSize: 17, margin: '0 0 10px' }}>{lang==='en'?'Sellable gaps next 30 days':'Buchi da vendere · prossimi 30 giorni'}</h3>
+            <p style={{ fontSize: 12.5, color: 'var(--bb-mute)', margin: '0 0 14px' }}>
+              {lang==='en'?'Empty windows worth pushing on direct channels.':'Finestre vuote da spingere sui canali diretti.'}
+            </p>
+            {[
+              { lodge: 'Tulipano', start: '18 lug', end: '23 lug', nights: 5, value: 900 },
+              { lodge: 'Gardenia', start: '21 lug', end: '26 lug', nights: 5, value: 975 },
+              { lodge: 'Frangipane', start: '21 lug', end: '25 lug', nights: 4, value: 720 },
+              { lodge: 'Azalea', start: '20 lug', end: '27 lug', nights: 7, value: 1400 },
+            ].map((g, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(122,155,126,0.06)', border: '1px dashed rgba(122,155,126,0.3)', marginBottom: 8 }}>
+                <window.IconSparkles size={15}/>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{g.lodge} · {g.nights} {lang==='en'?'nights':'notti'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--bb-mute)' }}>{g.start} → {g.end}</div>
+                </div>
+                <div className="bb-num" style={{ fontWeight: 700, color: 'var(--vo-sage-deep)' }}>{fmtEur(g.value)}</div>
+                <button className="bb-btn bb-btn--gold bb-btn--sm">{lang==='en'?'Push':'Spingi'}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BookingsListView({ lang, onSelectBooking }) {
+  return (
+    <>
+      <div data-screen-label="04 Bookings">
+        <div className="bb-eyebrow">{lang==='en'?'List':'Elenco'}</div>
+        <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 12px' }}>{lang==='en'?'All bookings':'Tutte le prenotazioni'}</h1>
+      </div>
+      <div className="bb-card" style={{ overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: 'var(--bb-surface-2)' }}>
+              {['#', lang==='en'?'Guest':'Ospite', 'Lodge', lang==='en'?'Period':'Periodo', lang==='en'?'Channel':'Canale', lang==='en'?'Total':'Totale', lang==='en'?'Status':'Stato', ''].map((h, i) => (
+                <th key={i} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, color: 'var(--bb-mute)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--bb-line)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {window.BOOKINGS.slice(0, 14).map(b => {
+              const lodge = window.LODGES.find(l => l.id === b.lodge);
+              const meta = window.STATUS_META[b.status];
+              const ch = window.CHANNELS[b.channel];
+              return (
+                <tr key={b.id} onClick={() => onSelectBooking(b)} style={{ borderBottom: '1px solid var(--bb-line-soft)', cursor: 'pointer' }}>
+                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 11, color: 'var(--bb-mute)' }}>#{b.id.toUpperCase()}</td>
+                  <td style={{ padding: '10px 14px', fontWeight: 600 }}>{b.guest}</td>
+                  <td style={{ padding: '10px 14px' }}>{lodge.name} {lodge.premium && <span style={{color:'var(--vo-gold-deep)'}}>★</span>}</td>
+                  <td style={{ padding: '10px 14px', color: 'var(--bb-ink-2)' }}>{fmtDateShort(b.arrival)} → {fmtDateShort(b.departure)} <span style={{ color: 'var(--bb-mute)' }}>· {b.nights}nt</span></td>
+                  <td style={{ padding: '10px 14px' }}><span className="bb-badge bb-badge--neutral">{ch.short}</span></td>
+                  <td className="bb-num" style={{ padding: '10px 14px', fontWeight: 700 }}>{fmtEur(b.total)}</td>
+                  <td style={{ padding: '10px 14px' }}><span className={`bb-badge bb-badge--${meta.color}`}>{meta.label}</span></td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right' }}><window.IconChevRight size={14}/></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function PlaceholderView({ active, lang }) {
+  const labels = {
+    guests: lang==='en'?'Guests':'Clienti',
+    payments: lang==='en'?'Payments':'Pagamenti',
+    reports: lang==='en'?'Reports':'Report',
+    export: lang==='en'?'Export data':'Esporta dati',
+    settings: lang==='en'?'Settings':'Impostazioni',
+  };
+  return (
+    <div className="bb-card" style={{ padding: 80, textAlign: 'center' }}>
+      <div style={{ width: 60, height: 60, borderRadius: 16, background: 'var(--bb-bg-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <window.IconLayers size={26}/>
+      </div>
+      <h2 className="bb-display" style={{ fontSize: 24, margin: '0 0 6px' }}>{labels[active] || active}</h2>
+      <p style={{ fontSize: 13.5, color: 'var(--bb-mute)' }}>
+        {lang==='en'?'This section is part of the next handoff phase.':'Questa sezione fa parte della prossima fase di handoff.'}
+      </p>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

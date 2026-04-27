@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" role="img" aria-label="Villa Olimpia">
+  
+  <line x1="130" y1="72" x2="278" y2="72" stroke="#0f3b57" stroke-width="0.8"></line>
+  <g transform="translate(300 72)">
+    <circle r="2" fill="#0f3b57"></circle>
+    <circle r="6" fill="none" stroke="#0f3b57" stroke-width="0.6"></circle>
+  </g>
+  <line x1="322" y1="72" x2="470" y2="72" stroke="#0f3b57" stroke-width="0.8"></line>
+
+  
+  <text x="300" y="118" text-anchor="middle" font-family="&#39;Playfair Display&#39;, &#39;Cormorant Garamond&#39;, &#39;Times New Roman&#39;, Georgia, serif" font-weight="500" font-size="42" fill="#0f3b57" letter-spacing="14">VILLA OLIMPIA</text>
+
+  
+  <line x1="220" y1="144" x2="380" y2="144" stroke="#0f3b57" stroke-width="0.8"></line>
+
+  
+  <text x="300" y="166" text-anchor="middle" font-family="&#39;Inter&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-weight="500" font-size="10" fill="#0f3b57" letter-spacing="5.5">CAPOPICCOLO · CALABRIA</text>
+</svg>
