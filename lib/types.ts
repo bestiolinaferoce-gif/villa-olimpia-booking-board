@@ -28,6 +28,20 @@ export const BOOKING_DATA_ORIGINS: readonly BookingDataOrigin[] = [
   "n8n",
 ] as const;
 
+export const BOOKING_TYPES = ["single_lodge", "whole_villa", "event"] as const;
+export type BookingType = (typeof BOOKING_TYPES)[number];
+
+export const EVENT_TYPES = ["wedding", "reception", "birthday", "corporate", "other"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+export const EVENT_TYPE_LABELS: Record<EventType, string> = {
+  wedding: "Matrimonio",
+  reception: "Ricevimento",
+  birthday: "Compleanno",
+  corporate: "Aziendale",
+  other: "Altro",
+};
+
 export type GuestProfile = {
   surname?: string;
   firstName?: string;
@@ -80,6 +94,12 @@ export type Booking = {
   reportingStatus?: GuestReportingStatus;
   /** Note operative sull'invio (es. errore ricevuto, data invio manuale) */
   reportingNotes?: string;
+  /** Tipo di prenotazione. Assente = "single_lodge" per backward compatibility. */
+  bookingType?: BookingType;
+  /** Sottotipo evento. Valorizzato solo se bookingType === "event". */
+  eventType?: EventType;
+  /** ID condiviso tra i 9 record di una stessa Villa Intera. */
+  wholeVillaGroupId?: string;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;

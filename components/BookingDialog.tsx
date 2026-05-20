@@ -2,10 +2,25 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { addDays, format, parseISO } from "date-fns";
-import { X } from "lucide-react";
+import { Home, PartyPopper, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type GuestProfile, type GuestReportingStatus, type Lodge } from "@/lib/types";
+import {
+  BOOKING_CHANNELS,
+  BOOKING_STATUSES,
+  EVENT_TYPES,
+  EVENT_TYPE_LABELS,
+  LODGES,
+  type Booking,
+  type BookingInput,
+  type BookingStatus,
+  type BookingType,
+  type EventType,
+  type GuestProfile,
+  type GuestReportingStatus,
+  type Lodge,
+} from "@/lib/types";
+import { isWholeVillaAllowed, wholeVillaAllowedMonthsLabel } from "@/lib/booking-config";
 import { buildAlloggiatiFileContent, alloggiatiFilename, isAlloggiatiReady } from "@/lib/integrations/alloggiati";
 
 type BookingDialogProps = {
@@ -22,6 +37,39 @@ type BookingDialogProps = {
 
 type FormState = BookingInput;
 
+type BookingTypeRadioProps = {
+  value: BookingType;
+  current: BookingType;
+  disabled?: boolean;
+  onChange: (v: BookingType) => void;
+  icon: React.ReactNode;
+  label: string;
+  hint?: string;
+};
+
+function BookingTypeRadio({ value, current, disabled, onChange, icon, label, hint }: BookingTypeRadioProps) {
+  const checked = current === value;
+  return (
+    <label
+      className={`booking-type-radio${checked ? " booking-type-radio--checked" : ""}${disabled ? " booking-type-radio--disabled" : ""}`}
+    >
+      <input
+        type="radio"
+        name="bookingType"
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={() => onChange(value)}
+      />
+      <span className="booking-type-radio__icon">{icon}</span>
+      <span className="booking-type-radio__body">
+        <span className="booking-type-radio__label">{label}</span>
+        {hint && <span className="booking-type-radio__hint">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 function buildDefault(lodge?: Lodge, day?: string): FormState {
   const checkIn = day || new Date().toISOString().slice(0, 10);
   const checkInDate = parseISO(checkIn);
@@ -37,6 +85,7 @@ function buildDefault(lodge?: Lodge, day?: string): FormState {
     totalAmount: 0,
     depositAmount: 0,
     depositReceived: false,
+    bookingType: "single_lodge",
   };
 }
 
@@ -94,6 +143,9 @@ export function BookingDialog({
         dataOrigin: booking.dataOrigin,
         reportingStatus: booking.reportingStatus,
         reportingNotes: booking.reportingNotes,
+        bookingType: booking.bookingType ?? "single_lodge",
+        eventType: booking.eventType,
+        wholeVillaGroupId: booking.wholeVillaGroupId,
       });
       setError("");
       setFieldErrors({});
@@ -213,20 +265,81 @@ export function BookingDialog({
 
           <div style={{ display: "grid", gap: "12px" }}>
             <div className="form-section">
+              <p className="form-section-title">Tipo prenotazione</p>
+              <div className="booking-type-selector" role="radiogroup" aria-label="Tipo prenotazione">
+                <BookingTypeRadio
+                  value="single_lodge"
+                  current={form.bookingType ?? "single_lodge"}
+                  disabled={mode === "edit"}
+                  onChange={(v) => change("bookingType", v)}
+                  icon={<Home size={16} />}
+                  label="Singolo lodge"
+                  hint="Una camera"
+                />
+                <BookingTypeRadio
+                  value="whole_villa"
+                  current={form.bookingType ?? "single_lodge"}
+                  disabled={mode === "edit" || !isWholeVillaAllowed(form.checkIn)}
+                  onChange={(v) => change("bookingType", v)}
+                  icon={<Home size={16} />}
+                  label="Villa Intera"
+                  hint={`Solo ${wholeVillaAllowedMonthsLabel()}`}
+                />
+                <BookingTypeRadio
+                  value="event"
+                  current={form.bookingType ?? "single_lodge"}
+                  disabled={mode === "edit"}
+                  onChange={(v) => change("bookingType", v)}
+                  icon={<PartyPopper size={16} />}
+                  label="Evento / Ricevimento"
+                  hint="Tutto l'anno"
+                />
+              </div>
+              {form.bookingType === "event" && (
+                <div className="form-grid" style={{ marginTop: 10 }}>
+                  <label>
+                    Tipo evento
+                    <select
+                      value={form.eventType ?? "wedding"}
+                      onChange={(e) => change("eventType", e.target.value as EventType)}
+                    >
+                      {EVENT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {EVENT_TYPE_LABELS[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+              {form.bookingType === "whole_villa" && !isWholeVillaAllowed(form.checkIn) && (
+                <p className="reporting-hint">
+                  ⚠ Check-in in mese non ammesso. Villa Intera disponibile solo in {wholeVillaAllowedMonthsLabel()}.
+                </p>
+              )}
+            </div>
+
+            <div className="form-section">
               <p className="form-section-title">Ospite &amp; Alloggio</p>
               <div className="form-grid">
                 <label>
                   Ospite
-                  <input value={form.guestName} onChange={(e) => change("guestName", e.target.value)} placeholder="Nome e cognome" />
+                  <input value={form.guestName} onChange={(e) => change("guestName", e.target.value)} placeholder={form.bookingType === "event" ? "Riferimento evento" : "Nome e cognome"} />
                   {fieldErrors.guestName && <span className="field-error">{fieldErrors.guestName}</span>}
                 </label>
-                <label>Lodge
-                  <select value={form.lodge} onChange={(e) => change("lodge", e.target.value as Lodge)}>
-                    {LODGES.map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </label>
+                {form.bookingType === "single_lodge" ? (
+                  <label>Lodge
+                    <select value={form.lodge} onChange={(e) => change("lodge", e.target.value as Lodge)}>
+                      {LODGES.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </label>
+                ) : (
+                  <label>Lodge
+                    <input value={form.bookingType === "whole_villa" ? "Tutti i lodge (9)" : "Intera struttura"} disabled style={{ background: "var(--bg)", color: "var(--muted)" }} />
+                  </label>
+                )}
                 <label>
-                  N. ospiti
+                  {form.bookingType === "event" ? "Partecipanti" : "N. ospiti"}
                   <input type="number" min={1} value={form.guestsCount} onChange={(e) => change("guestsCount", Math.max(1, parseInt(e.target.value || "1", 10)))} />
                   {fieldErrors.guestsCount && <span className="field-error">{fieldErrors.guestsCount}</span>}
                 </label>
