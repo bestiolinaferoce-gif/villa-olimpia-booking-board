@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { addMonths, format, parseISO, startOfMonth } from "date-fns";
+import { addDays, addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
 import {
   BOOKING_CHANNELS,
@@ -11,10 +11,12 @@ import {
   type BookingDataOrigin,
   type BookingFilters,
   type BookingInput,
+  type BookingType,
   type Lodge,
 } from "@/lib/types";
 import { BACKUP_KEY, DELETED_KEY, overlaps, SETTINGS_KEY, STORAGE_KEY } from "@/lib/utils";
 import { reconcileBookings } from "@/lib/reconciliation";
+import { isWholeVillaAllowed, wholeVillaAllowedMonthsLabel } from "@/lib/booking-config";
 
 export type ImportMergeSkipDetail = {
   id: string;
@@ -96,7 +98,8 @@ function validateBookingPayload(payload: BookingInput): void {
   }
   const checkIn = parseISO(payload.checkIn);
   const checkOut = parseISO(payload.checkOut);
-  if (!(checkIn < checkOut)) {
+  const isEventDayUse = payload.bookingType === "event" && payload.checkIn === payload.checkOut;
+  if (!isEventDayUse && !(checkIn < checkOut)) {
     throw new Error("Il check-out deve essere successivo al check-in.");
   }
   if (payload.guestsCount < 1 || !Number.isInteger(payload.guestsCount)) {
@@ -127,9 +130,48 @@ function validateBookingPayload(payload: BookingInput): void {
   }
 }
 
-function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?: string): void {
+function effectiveType(b: { bookingType?: BookingType }): BookingType {
+  return b.bookingType ?? "single_lodge";
+}
+
+/** Day-use event: checkIn === checkOut → normalizza a [checkIn, checkIn+1) per overlap/storage. */
+function normalizeDayUse(payload: BookingInput): BookingInput {
+  if (payload.bookingType === "event" && payload.checkIn === payload.checkOut) {
+    return { ...payload, checkOut: format(addDays(parseISO(payload.checkIn), 1), "yyyy-MM-dd") };
+  }
+  return payload;
+}
+
+function blocksAllLodges(t: BookingType): boolean {
+  return t === "whole_villa" || t === "event";
+}
+
+function ensureNoOverlap(
+  bookings: Booking[],
+  payload: BookingInput,
+  excludeId?: string,
+  excludeGroupId?: string,
+): void {
+  const newType = effectiveType(payload);
+  const newBlocksAll = blocksAllLodges(newType);
+
   const colliding = bookings.find((booking) => {
     if (excludeId && booking.id === excludeId) {
+      return false;
+    }
+    // Same whole_villa group: skip self-conflicts when inserting the 9 sibling records.
+    if (
+      excludeGroupId &&
+      booking.wholeVillaGroupId &&
+      booking.wholeVillaGroupId === excludeGroupId
+    ) {
+      return false;
+    }
+    if (
+      payload.wholeVillaGroupId &&
+      booking.wholeVillaGroupId &&
+      booking.wholeVillaGroupId === payload.wholeVillaGroupId
+    ) {
       return false;
     }
     // Same Airbnb sync reservation with a different id (e.g. id format changed
@@ -143,19 +185,48 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
     ) {
       return false;
     }
-    if (booking.lodge !== payload.lodge) {
-      return false;
-    }
     if (booking.status === "cancelled") {
       return false;
     }
     if (payload.status === "cancelled") {
       return false;
     }
+
+    const bType = effectiveType(booking);
+    const bBlocksAll = blocksAllLodges(bType);
+
+    if (newBlocksAll || bBlocksAll) {
+      // Almeno una delle due occupa tutta la struttura: basta l'overlap di date.
+      return overlaps(booking, payload);
+    }
+    // Entrambe single_lodge: stessa lodge + overlap di date.
+    if (booking.lodge !== payload.lodge) {
+      return false;
+    }
     return overlaps(booking, payload);
   });
   if (colliding) {
-    throw new Error(`Sovrapposizione su ${payload.lodge} con prenotazione ${colliding.guestName} (${colliding.checkIn} → ${colliding.checkOut}).`);
+    const collidingType = effectiveType(colliding);
+    if (newBlocksAll && collidingType === "single_lodge") {
+      throw new Error(
+        `Sovrapposizione: ${colliding.guestName} su ${colliding.lodge} (${colliding.checkIn} → ${colliding.checkOut}).`,
+      );
+    }
+    if (!newBlocksAll && blocksAllLodges(collidingType)) {
+      const label = collidingType === "whole_villa" ? "Villa Intera" : "Evento";
+      throw new Error(
+        `Sovrapposizione con ${label} (${colliding.guestName}, ${colliding.checkIn} → ${colliding.checkOut}).`,
+      );
+    }
+    if (newBlocksAll && blocksAllLodges(collidingType)) {
+      const label = collidingType === "whole_villa" ? "Villa Intera" : "Evento";
+      throw new Error(
+        `Sovrapposizione con ${label} esistente (${colliding.guestName}, ${colliding.checkIn} → ${colliding.checkOut}).`,
+      );
+    }
+    throw new Error(
+      `Sovrapposizione su ${payload.lodge} con prenotazione ${colliding.guestName} (${colliding.checkIn} → ${colliding.checkOut}).`,
+    );
   }
 }
 
@@ -196,12 +267,17 @@ function bookingUpdatedMs(b: Booking): number {
 /** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano nel merge (P0 integrità).
  *  `deletedIds`: IDs deleted locally — stripped from serverRows so they cannot be resurrected by poll/merge. */
 function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[], deletedIds?: Set<string>): Booking[] {
+  const hasDeleted = !!deletedIds && deletedIds.size > 0;
   const map = new Map<string, Booking>();
-  const rows = deletedIds && deletedIds.size > 0 ? serverRows.filter((b) => !deletedIds.has(b.id)) : serverRows;
+  const rows = hasDeleted ? serverRows.filter((b) => !deletedIds!.has(b.id)) : serverRows;
   for (const b of rows) {
     map.set(b.id, b);
   }
-  for (const b of localRows) {
+  // Filtra anche le righe locali: se l'id è tombstonato (cancellato lato server o lato locale)
+  // non deve essere reintrodotto dalla cache. Fix per "prenotazioni fantasma" che riappaiono dopo
+  // cancellazione su un altro client.
+  const localFiltered = hasDeleted ? localRows.filter((b) => !deletedIds!.has(b.id)) : localRows;
+  for (const b of localFiltered) {
     const s = map.get(b.id);
     if (!s) {
       map.set(b.id, b);
@@ -513,23 +589,66 @@ export const useBookingStore = create<BookingState>((set, get) => {
   showToast: (message, type = "success", durationMs) =>
     set({ toast: { message, type, ...(durationMs !== undefined ? { durationMs } : {}) } }),
   clearToast: () => set({ toast: null }),
-  addBooking: (payload) => {
-    validateBookingPayload(payload);
+  addBooking: (rawPayload) => {
+    validateBookingPayload(rawPayload);
+    const payload = normalizeDayUse(rawPayload);
     const deletedIds = get().deletedIds;
     const bookings = deletedIds.size > 0
       ? get().bookings.filter((b) => !deletedIds.has(b.id))
       : get().bookings;
-    ensureNoOverlap(bookings, payload);
+
+    const bookingType: BookingType = payload.bookingType ?? "single_lodge";
     const now = new Date().toISOString();
+    const guestName = payload.guestName.trim();
+    const notes = payload.notes.trim();
+    const economicNotes = payload.economicNotes?.trim() || undefined;
+    const dataOrigin = isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : "manual";
+
+    if (bookingType === "whole_villa") {
+      if (!isWholeVillaAllowed(payload.checkIn)) {
+        throw new Error(
+          `Villa Intera ammessa solo nei mesi: ${wholeVillaAllowedMonthsLabel()}.`,
+        );
+      }
+      const groupId = payload.wholeVillaGroupId || uuidv4();
+      // Pre-check overlap on the full period (single pass: any blocking booking).
+      ensureNoOverlap(bookings, { ...payload, bookingType: "whole_villa", wholeVillaGroupId: groupId });
+
+      const perLodgeAmount = payload.totalAmount > 0 ? payload.totalAmount / LODGES.length : 0;
+      const perLodgeDeposit = payload.depositAmount > 0 ? payload.depositAmount / LODGES.length : 0;
+      const records: Booking[] = LODGES.map((lodge, idx) => ({
+        id: uuidv4(),
+        ...payload,
+        lodge,
+        bookingType: "whole_villa",
+        wholeVillaGroupId: groupId,
+        isNew: idx === 0,
+        guestName,
+        notes,
+        economicNotes,
+        totalAmount: Math.round(perLodgeAmount * 100) / 100,
+        depositAmount: Math.round(perLodgeDeposit * 100) / 100,
+        dataOrigin,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      const next = [...bookings, ...records].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+      set({ bookings: next });
+      persist(next);
+      return records[0];
+    }
+
+    ensureNoOverlap(bookings, payload);
     const booking: Booking = {
       id: uuidv4(),
       ...payload,
+      bookingType,
       isNew: true,
-      guestName: payload.guestName.trim(),
-      notes: payload.notes.trim(),
-      economicNotes: payload.economicNotes?.trim() || undefined,
+      guestName,
+      notes,
+      economicNotes,
       guestsCount: payload.guestsCount,
-      dataOrigin: isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : "manual",
+      dataOrigin,
       createdAt: now,
       updatedAt: now,
     };
@@ -538,27 +657,70 @@ export const useBookingStore = create<BookingState>((set, get) => {
     persist(next);
     return booking;
   },
-  updateBooking: (id, payload) => {
-    validateBookingPayload(payload);
+  updateBooking: (id, rawPayload) => {
+    validateBookingPayload(rawPayload);
+    const payload = normalizeDayUse(rawPayload);
     const bookings = get().bookings;
     const current = bookings.find((booking) => booking.id === id);
     if (!current) {
       throw new Error("Prenotazione non trovata.");
     }
+    const groupId = current.wholeVillaGroupId;
+    const isWholeVillaGroup = current.bookingType === "whole_villa" && groupId;
+
     // Use the reconciled (deduplicated) list so hidden duplicates in the raw
     // store do not trigger a false overlap error when editing the visible booking.
     const { bookings: canonical } = reconcileBookings(bookings);
-    ensureNoOverlap(canonical, payload, id);
+    ensureNoOverlap(canonical, payload, id, isWholeVillaGroup ? groupId : undefined);
+
+    const now = new Date().toISOString();
+    const guestName = payload.guestName.trim();
+    const notes = payload.notes.trim();
+    const economicNotes = payload.economicNotes?.trim() || undefined;
+    const dataOrigin = isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : current.dataOrigin;
+
+    if (isWholeVillaGroup) {
+      // Propaga update a tutti i 9 record del gruppo (date/stato/anagrafica/note).
+      // L'importo viene splittato per lodge.
+      const perLodgeAmount = payload.totalAmount > 0 ? payload.totalAmount / LODGES.length : 0;
+      const perLodgeDeposit = payload.depositAmount > 0 ? payload.depositAmount / LODGES.length : 0;
+      const next = bookings
+        .map((b) => {
+          if (b.wholeVillaGroupId !== groupId) return b;
+          return {
+            ...b,
+            ...payload,
+            // mantieni lodge originale di ciascun record del gruppo
+            lodge: b.lodge,
+            bookingType: "whole_villa" as BookingType,
+            wholeVillaGroupId: groupId,
+            isNew: payload.isNew ?? false,
+            guestName,
+            notes,
+            economicNotes,
+            totalAmount: Math.round(perLodgeAmount * 100) / 100,
+            depositAmount: Math.round(perLodgeDeposit * 100) / 100,
+            updatedAt: now,
+            guestProfile: payload.guestProfile ?? b.guestProfile,
+            dataOrigin,
+          } as Booking;
+        })
+        .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+      set({ bookings: next });
+      persist(next);
+      return next.find((b) => b.id === id)!;
+    }
+
     const updated: Booking = {
       ...current,
       ...payload,
       isNew: payload.isNew ?? false,
-      guestName: payload.guestName.trim(),
-      notes: payload.notes.trim(),
-      economicNotes: payload.economicNotes?.trim() || undefined,
-      updatedAt: new Date().toISOString(),
+      guestName,
+      notes,
+      economicNotes,
+      updatedAt: now,
       guestProfile: payload.guestProfile ?? current.guestProfile,
-      dataOrigin: isBookingDataOrigin(payload.dataOrigin) ? payload.dataOrigin : current.dataOrigin,
+      dataOrigin,
     };
     const next = bookings.map((booking) => (booking.id === id ? updated : booking)).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     set({ bookings: next });
@@ -566,8 +728,20 @@ export const useBookingStore = create<BookingState>((set, get) => {
     return updated;
   },
   deleteBooking: (id) => {
-    const next = get().bookings.filter((booking) => booking.id !== id);
-    const newDeletedIds = new Set([...get().deletedIds, id]);
+    const bookings = get().bookings;
+    const target = bookings.find((b) => b.id === id);
+    const groupId = target?.wholeVillaGroupId;
+    let removedIds: string[];
+    let next: Booking[];
+    if (target?.bookingType === "whole_villa" && groupId) {
+      const removed = bookings.filter((b) => b.wholeVillaGroupId === groupId);
+      removedIds = removed.map((b) => b.id);
+      next = bookings.filter((b) => b.wholeVillaGroupId !== groupId);
+    } else {
+      removedIds = [id];
+      next = bookings.filter((booking) => booking.id !== id);
+    }
+    const newDeletedIds = new Set([...get().deletedIds, ...removedIds]);
     set({ bookings: next, deletedIds: newDeletedIds });
     persistDeletedIds(newDeletedIds);
     persist(next);

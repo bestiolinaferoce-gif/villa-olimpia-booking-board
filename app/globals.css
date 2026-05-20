@@ -1457,3 +1457,161 @@ body {
   border-radius: 6px;
   padding: 6px 10px;
 }
+
+/* =========================================================
+   BOOKING TYPE SELECTOR
+   ========================================================= */
+
+.booking-type-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.booking-type-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 120ms, background 120ms;
+}
+
+.booking-type-radio input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.booking-type-radio__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.booking-type-radio__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.booking-type-radio__label {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #111827;
+}
+
+.booking-type-radio__hint {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.booking-type-radio--checked {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.booking-type-radio--checked .booking-type-radio__icon {
+  background: #2563eb;
+  color: #fff;
+}
+
+.booking-type-radio--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .booking-type-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   GANTT: VILLA INTERA + EVENT BAR + DRAG&DROP
+   ========================================================= */
+
+.gantt-whole-villa-row {
+  position: relative;
+  height: 0;
+}
+
+.gantt-whole-villa-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: linear-gradient(90deg, #c9a462 0%, #e2c28a 50%, #c9a462 100%);
+  color: #3a2a05;
+  border: 1px solid #a17b2f;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.gantt-event-bar {
+  background: #c9784a;
+  color: #fff;
+  border: 1px solid #8a4e26;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.gantt-event-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.gantt-cell-overbooked {
+  outline: 2px solid #ef4444;
+  outline-offset: -2px;
+  animation: gantt-overbook-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes gantt-overbook-pulse {
+  0%, 100% { outline-color: rgba(239, 68, 68, 0.95); }
+  50% { outline-color: rgba(239, 68, 68, 0.35); }
+}
+
+.gantt-cell-draggable {
+  cursor: grab;
+}
+
+.gantt-cell-draggable:active,
+.gantt-cell-dragging {
+  cursor: grabbing !important;
+}
+
+.gantt-row--drop-valid {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.gantt-row--drop-invalid {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.gantt-row--drop-swap {
+  background: rgba(234, 179, 8, 0.18);
+}
