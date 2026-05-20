@@ -267,12 +267,17 @@ function bookingUpdatedMs(b: Booking): number {
 /** KV + locale: stesso id → vince `updatedAt` più recente; id solo in locale restano nel merge (P0 integrità).
  *  `deletedIds`: IDs deleted locally — stripped from serverRows so they cannot be resurrected by poll/merge. */
 function mergeKvWithLocal(serverRows: Booking[], localRows: Booking[], deletedIds?: Set<string>): Booking[] {
+  const hasDeleted = !!deletedIds && deletedIds.size > 0;
   const map = new Map<string, Booking>();
-  const rows = deletedIds && deletedIds.size > 0 ? serverRows.filter((b) => !deletedIds.has(b.id)) : serverRows;
+  const rows = hasDeleted ? serverRows.filter((b) => !deletedIds!.has(b.id)) : serverRows;
   for (const b of rows) {
     map.set(b.id, b);
   }
-  for (const b of localRows) {
+  // Filtra anche le righe locali: se l'id è tombstonato (cancellato lato server o lato locale)
+  // non deve essere reintrodotto dalla cache. Fix per "prenotazioni fantasma" che riappaiono dopo
+  // cancellazione su un altro client.
+  const localFiltered = hasDeleted ? localRows.filter((b) => !deletedIds!.has(b.id)) : localRows;
+  for (const b of localFiltered) {
     const s = map.get(b.id);
     if (!s) {
       map.set(b.id, b);
