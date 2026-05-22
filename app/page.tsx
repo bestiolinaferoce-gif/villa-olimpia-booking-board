@@ -21,6 +21,7 @@ import { BoardPrintDocument } from "@/components/BoardPrintDocument";
 import { PrintOptionsDialog } from "@/components/PrintOptionsDialog";
 import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
+import { OverbookingPanel } from "@/components/OverbookingPanel";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
@@ -411,6 +412,12 @@ export default function Home() {
           <p>{format(monthDate, "MMMM yyyy")}</p>
         </div>
       </section>
+
+      <OverbookingPanel
+        conflicts={reconciled.conflicts}
+        bookings={canonicalBookings}
+        onOpenBooking={openEditBooking}
+      />
 
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
 
