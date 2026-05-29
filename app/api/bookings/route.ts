@@ -15,6 +15,38 @@ type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[]
 
 const PROPERTY = 'villa-olimpia';
 
+/**
+ * Protezione LETTURA di /api/bookings.
+ * Lascia passare:
+ *  - il browser della board stessa (richiesta same-origin: Origin/Referer sul dominio del deploy)
+ *  - chi presenta il token segreto in header X-Internal-Token (es. Cowork / automazioni)
+ * Blocca tutto il resto con 403 (es. URL aperto a mano, scraper anonimi).
+ * Fail-open: se nessun secret è configurato sul server, non blocca nulla (la board non si rompe mai).
+ */
+function bookingReadAuthError(req: NextRequest): NextResponse | null {
+  const secret = (
+    process.env.NEXT_PUBLIC_API_WRITE_SECRET ??
+    process.env.API_WRITE_SECRET ??
+    process.env.CRON_SECRET ??
+    ''
+  ).trim();
+
+  // Nessun secret configurato → nessun enforcement (comportamento attuale, niente rischio).
+  if (!secret) return null;
+
+  // 1) Token corretto (Cowork, automazioni, cron).
+  const clientToken = (req.headers.get('x-internal-token') ?? '').trim();
+  if (clientToken === secret) return null;
+
+  // 2) Richiesta same-origin dal browser della board.
+  const host = (req.headers.get('host') ?? '').trim();
+  const origin = req.headers.get('origin') ?? '';
+  const referer = req.headers.get('referer') ?? '';
+  if (host && (origin.includes(host) || referer.includes(host))) return null;
+
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+}
+
 function calculateNights(checkIn: string, checkOut: string) {
   const start = new Date(checkIn);
   const end = new Date(checkOut);
@@ -105,7 +137,10 @@ async function readKV(): Promise<{ payload: KVPayload | null; raw: string | null
   return { payload: parsed as KVPayload, raw: json.result };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authErr = bookingReadAuthError(req);
+  if (authErr) return authErr;
+
   if (!BASE || !TOKEN) return NextResponse.json({ v: 0, ts: '', data: [] });
   try {
     const { payload } = await readKV();
