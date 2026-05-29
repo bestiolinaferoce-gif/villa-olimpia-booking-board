@@ -24,7 +24,6 @@ export function computeDropState(
     if (b.id === activeBooking.id) return false;
     if (b.status === "cancelled") return false;
     if (b.lodge !== targetLodge) return false;
-    if (b.bookingType === "whole_villa" || b.bookingType === "event") return true; // ignora dedup, considera collisione
     return overlaps(b, activeBooking);
   });
 

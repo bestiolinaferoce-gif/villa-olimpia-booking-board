@@ -69,6 +69,12 @@ interface SyncResult {
   error?: string;
 }
 
+function isAirbnbSyncManagedBooking(booking: Booking): boolean {
+  if (booking.channel !== "airbnb") return false;
+  const origin = booking.dataOrigin;
+  return origin === undefined || origin === "sync" || origin === "import_json";
+}
+
 async function syncProperty(
   config: AirbnbSyncConfig,
   existing: Booking[],
@@ -146,14 +152,13 @@ async function syncProperty(
     }
   }
 
-  // Auto-cancella SOLO prenotazioni create dal sync non piu' presenti nel feed
+  // Auto-cancella prenotazioni Airbnb gestite da feed/import non piu' presenti nel feed.
   const syncedIds = new Set(events.map((e) => airbnbBookingId(e.confirmationCode)));
   for (let i = 0; i < updated.length; i++) {
     const b = updated[i];
     if (
       b.lodge === config.lodge &&
-      b.channel === "airbnb" &&
-      b.dataOrigin === "sync" &&
+      isAirbnbSyncManagedBooking(b) &&
       b.status !== "cancelled" &&
       !syncedIds.has(b.id)
     ) {
