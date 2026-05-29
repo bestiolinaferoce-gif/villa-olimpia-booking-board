@@ -12,7 +12,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   addDays,
   differenceInDays,
@@ -23,7 +22,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { Briefcase, Calendar as CalendarIcon, PartyPopper } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DraggableBookingBar } from "@/components/DraggableBookingBar";
 import { useBookingStore } from "@/lib/store";
@@ -309,7 +308,14 @@ export function GanttBoard({
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const [overLodge, setOverLodge] = useState<Lodge | null>(null);
   const [pendingSwap, setPendingSwap] = useState<{ a: Booking; b: Booking; targetLodge: Lodge } | null>(null);
-  const [pendingMove, setPendingMove] = useState<{ booking: Booking; targetLodge: Lodge } | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ booking: Booking; targetLodge: Lodge; checkIn: string; checkOut: string } | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  /** Larghezza in px di una colonna-giorno, letta dal DOM (le colonne giorno hanno egual larghezza). */
+  function dayColWidth(): number {
+    const el = boardRef.current?.querySelector(".gantt-day-header");
+    return el ? (el as HTMLElement).getBoundingClientRect().width : 0;
+  }
 
   const dropState: DropState | null = useMemo(() => {
     if (!activeBooking || !overLodge) return null;
@@ -339,47 +345,63 @@ export function GanttBoard({
     setActiveBooking(null);
     setOverLodge(null);
 
-    if (!active || !target || target === active.lodge) return;
-    const state = computeDropState(active, target, bookings);
-    if (state === "invalid") {
-      showToast(`Sovrapposizione su ${target}: impossibile spostare.`, "error", 5000);
-      return;
-    }
-    if (state === "swap") {
-      const other = bookings.find(
-        (b) =>
-          b.id !== active.id &&
-          b.lodge === target &&
-          b.status !== "cancelled" &&
-          (b.bookingType ?? "single_lodge") === "single_lodge",
-      );
-      if (other) {
-        setPendingSwap({ a: active, b: other, targetLodge: target });
+    if (!active || !target) return;
+
+    // Spostamento orizzontale: numero di giorni dedotto dallo spostamento in px.
+    const colW = dayColWidth();
+    const daysShift = colW > 0 ? Math.round(e.delta.x / colW) : 0;
+
+    // Solo cambio lodge (nessuno shift di date): mantieni validazione + UX swap.
+    if (daysShift === 0) {
+      if (target === active.lodge) return;
+      const state = computeDropState(active, target, bookings);
+      if (state === "invalid") {
+        showToast(`Sovrapposizione su ${target}: impossibile spostare.`, "error", 5000);
         return;
       }
+      if (state === "swap") {
+        const other = bookings.find(
+          (b) =>
+            b.id !== active.id &&
+            b.lodge === target &&
+            b.status !== "cancelled" &&
+            (b.bookingType ?? "single_lodge") === "single_lodge",
+        );
+        if (other) {
+          setPendingSwap({ a: active, b: other, targetLodge: target });
+          return;
+        }
+      }
+      // Conferma sempre richiesta prima di applicare lo spostamento, per evitare
+      // spostamenti accidentali durante il drag.
+      setPendingMove({ booking: active, targetLodge: target, checkIn: active.checkIn, checkOut: active.checkOut });
+      return;
     }
-    // Conferma sempre richiesta prima di applicare lo spostamento, per evitare
-    // spostamenti accidentali durante il drag.
-    setPendingMove({ booking: active, targetLodge: target });
+
+    // Shift di date (eventualmente + cambio lodge): l'overlap sulla nuova posizione
+    // viene validato da ensureNoOverlap nello store al momento della conferma.
+    const newCheckIn = format(addDays(parseISO(active.checkIn), daysShift), "yyyy-MM-dd");
+    const newCheckOut = format(addDays(parseISO(active.checkOut), daysShift), "yyyy-MM-dd");
+    setPendingMove({ booking: active, targetLodge: target, checkIn: newCheckIn, checkOut: newCheckOut });
   }
 
   function confirmMove() {
     if (!pendingMove) return;
-    const { booking, targetLodge } = pendingMove;
+    const { booking, targetLodge, checkIn, checkOut } = pendingMove;
     try {
-      moveBooking(booking, targetLodge);
+      moveBooking(booking, targetLodge, checkIn, checkOut);
     } finally {
       setPendingMove(null);
     }
   }
 
-  function moveBooking(b: Booking, targetLodge: Lodge) {
+  function moveBooking(b: Booking, targetLodge: Lodge, checkIn: string = b.checkIn, checkOut: string = b.checkOut) {
     try {
       updateBooking(b.id, {
         guestName: b.guestName,
         lodge: targetLodge,
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
+        checkIn,
+        checkOut,
         status: b.status,
         channel: b.channel,
         notes: b.notes,
@@ -427,12 +449,11 @@ export function GanttBoard({
     <>
       <DndContext
         sensors={sensors}
-        modifiers={[restrictToVerticalAxis]}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="gantt-wrap no-print" style={{ overflowX: "auto" }}>
+        <div ref={boardRef} className="gantt-wrap no-print" style={{ overflowX: "auto" }}>
           <div
             className="gantt-header"
             style={{
@@ -502,7 +523,7 @@ export function GanttBoard({
         open={!!pendingMove}
         title="Sposta prenotazione"
         message={pendingMove
-          ? `${pendingMove.booking.guestName}\n${pendingMove.booking.checkIn} → ${pendingMove.booking.checkOut}\n\nSpostare da ${pendingMove.booking.lodge} a ${pendingMove.targetLodge}?`
+          ? `${pendingMove.booking.guestName}\n\nDa:  ${pendingMove.booking.lodge} · ${pendingMove.booking.checkIn} → ${pendingMove.booking.checkOut}\nA:   ${pendingMove.targetLodge} · ${pendingMove.checkIn} → ${pendingMove.checkOut}\n\nConfermare lo spostamento?`
           : ""}
         confirmLabel="Sposta"
         onConfirm={confirmMove}
