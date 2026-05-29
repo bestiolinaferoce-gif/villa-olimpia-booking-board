@@ -309,6 +309,7 @@ export function GanttBoard({
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const [overLodge, setOverLodge] = useState<Lodge | null>(null);
   const [pendingSwap, setPendingSwap] = useState<{ a: Booking; b: Booking; targetLodge: Lodge } | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ booking: Booking; targetLodge: Lodge } | null>(null);
 
   const dropState: DropState | null = useMemo(() => {
     if (!activeBooking || !overLodge) return null;
@@ -357,7 +358,19 @@ export function GanttBoard({
         return;
       }
     }
-    moveBooking(active, target);
+    // Conferma sempre richiesta prima di applicare lo spostamento, per evitare
+    // spostamenti accidentali durante il drag.
+    setPendingMove({ booking: active, targetLodge: target });
+  }
+
+  function confirmMove() {
+    if (!pendingMove) return;
+    const { booking, targetLodge } = pendingMove;
+    try {
+      moveBooking(booking, targetLodge);
+    } finally {
+      setPendingMove(null);
+    }
   }
 
   function moveBooking(b: Booking, targetLodge: Lodge) {
@@ -484,6 +497,17 @@ export function GanttBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <ConfirmDialog
+        open={!!pendingMove}
+        title="Sposta prenotazione"
+        message={pendingMove
+          ? `${pendingMove.booking.guestName}\n${pendingMove.booking.checkIn} → ${pendingMove.booking.checkOut}\n\nSpostare da ${pendingMove.booking.lodge} a ${pendingMove.targetLodge}?`
+          : ""}
+        confirmLabel="Sposta"
+        onConfirm={confirmMove}
+        onClose={() => setPendingMove(null)}
+      />
 
       <ConfirmDialog
         open={!!pendingSwap}

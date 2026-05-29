@@ -101,6 +101,10 @@ export function BookingDialog({
   onDelete,
 }: BookingDialogProps) {
   const mode = booking ? "edit" : "create";
+  // In modifica il tipo è cambiabile liberamente tra Singolo lodge ed Evento.
+  // La conversione da/verso Villa Intera resta bloccata: è un gruppo di 9 record,
+  // va gestita con elimina + ricrea per non corrompere i dati.
+  const lockTypeChange = mode === "edit" && booking?.bookingType === "whole_villa";
   const [form, setForm] = useState<FormState>(buildDefault(initialLodge, initialDate));
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -270,7 +274,7 @@ export function BookingDialog({
                 <BookingTypeRadio
                   value="single_lodge"
                   current={form.bookingType ?? "single_lodge"}
-                  disabled={mode === "edit"}
+                  disabled={lockTypeChange}
                   onChange={(v) => change("bookingType", v)}
                   icon={<Home size={16} />}
                   label="Singolo lodge"
@@ -288,7 +292,7 @@ export function BookingDialog({
                 <BookingTypeRadio
                   value="event"
                   current={form.bookingType ?? "single_lodge"}
-                  disabled={mode === "edit"}
+                  disabled={lockTypeChange}
                   onChange={(v) => change("bookingType", v)}
                   icon={<PartyPopper size={16} />}
                   label="Evento / Ricevimento"
