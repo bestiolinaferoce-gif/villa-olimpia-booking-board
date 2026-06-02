@@ -22,7 +22,7 @@ import { PrintOptionsDialog } from "@/components/PrintOptionsDialog";
 import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { OverbookingPanel } from "@/components/OverbookingPanel";
-import { BoardAssistant } from "@/components/BoardAssistant";
+import { BoardAssistant, type AssistantAction } from "@/components/BoardAssistant";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
@@ -173,6 +173,37 @@ export default function Home() {
     setEditing(booking);
     setPrefill({});
     setDialogOpen(true);
+  }
+
+  /** Applica un'azione proposta dall'assistente AI (previa conferma utente nella chat). */
+  function applyAssistantAction(action: AssistantAction): { ok: boolean; message: string } {
+    const id = String(action.input.bookingId ?? "");
+    const booking = canonicalBookings.find((b) => b.id === id);
+    if (!booking) return { ok: false, message: "Prenotazione non trovata." };
+    // BookingInput = Booking senza id/createdAt/updatedAt
+    const { id: _id, createdAt: _c, updatedAt: _u, ...base } = booking;
+    void _id; void _c; void _u;
+    const payload: BookingInput = { ...base };
+    try {
+      if (action.tool === "mark_deposit_received") {
+        payload.depositReceived = true;
+      } else if (action.tool === "set_status") {
+        const status = String(action.input.status);
+        if (!["confirmed", "option", "cancelled"].includes(status)) {
+          return { ok: false, message: "Stato non valido." };
+        }
+        payload.status = status as Booking["status"];
+      } else if (action.tool === "update_amounts") {
+        if (typeof action.input.totalAmount === "number") payload.totalAmount = action.input.totalAmount;
+        if (typeof action.input.depositAmount === "number") payload.depositAmount = action.input.depositAmount;
+      } else {
+        return { ok: false, message: "Azione non riconosciuta." };
+      }
+      updateBooking(booking.id, payload);
+      return { ok: true, message: "Applicato." };
+    } catch {
+      return { ok: false, message: "Errore durante l'applicazione." };
+    }
   }
 
   function onImportClick() {
@@ -426,6 +457,7 @@ export default function Home() {
         onOpenBooking={openEditBooking}
         monthLabel={format(monthDate, "MMMM yyyy")}
         monthRevenue={monthKPIs.revenue}
+        onApplyAction={applyAssistantAction}
       />
 
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />

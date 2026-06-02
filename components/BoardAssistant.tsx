@@ -18,6 +18,14 @@ const SEVERITY_STYLE: Record<
 
 const DISMISS_KEY = "vob_assistant_autodismissed_at";
 
+export type AssistantAction = {
+  tool: string;
+  input: Record<string, unknown>;
+  label: string;
+};
+
+type ChatMsg = { role: "user" | "assistant"; content: string; actions?: AssistantAction[] };
+
 type BoardAssistantProps = {
   bookings: Booking[];
   conflicts: BookingConflict[];
@@ -26,6 +34,8 @@ type BoardAssistantProps = {
   monthLabel?: string;
   /** Revenue del mese mostrato in board (stesso valore del KPIPanel, pro-rata notti). */
   monthRevenue?: number;
+  /** Applica un'azione proposta dall'assistente. Ritorna esito. */
+  onApplyAction?: (action: AssistantAction) => { ok: boolean; message: string };
 };
 
 function eur0(value: number): string {
@@ -42,14 +52,16 @@ export function BoardAssistant({
   onOpenBooking,
   monthLabel,
   monthRevenue,
+  onApplyAction,
 }: BoardAssistantProps) {
   const [open, setOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [tab, setTab] = useState<"analisi" | "chat">("analisi");
-  const [chat, setChat] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chat, setChat] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [applied, setApplied] = useState<Record<string, "done" | "error">>({});
 
   const analysis = useMemo(
     () => analyzeBoard(bookings, conflicts, new Date()),
@@ -78,7 +90,10 @@ export function BoardAssistant({
       if (!res.ok || !data.ok) {
         setChatError(data.message || "Assistente non disponibile.");
       } else {
-        setChat((c) => [...c, { role: "assistant", content: data.reply as string }]);
+        setChat((c) => [
+          ...c,
+          { role: "assistant", content: data.reply as string, actions: data.actions as AssistantAction[] | undefined },
+        ]);
       }
     } catch {
       setChatError("Errore di rete verso l'assistente.");
@@ -405,18 +420,73 @@ export function BoardAssistant({
                       key={i}
                       style={{
                         alignSelf: m.role === "user" ? "end" : "start",
-                        maxWidth: "85%",
-                        background: m.role === "user" ? "#0f2742" : "#fff",
-                        color: m.role === "user" ? "#fff" : "#0f172a",
-                        border: m.role === "user" ? "none" : "1px solid #e2e8f0",
-                        borderRadius: 12,
-                        padding: "9px 12px",
-                        fontSize: 13,
-                        lineHeight: 1.5,
-                        whiteSpace: "pre-wrap",
+                        maxWidth: "92%",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
                       }}
                     >
-                      {m.content}
+                      <div
+                        style={{
+                          background: m.role === "user" ? "#0f2742" : "#fff",
+                          color: m.role === "user" ? "#fff" : "#0f172a",
+                          border: m.role === "user" ? "none" : "1px solid #e2e8f0",
+                          borderRadius: 12,
+                          padding: "9px 12px",
+                          fontSize: 13,
+                          lineHeight: 1.5,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {m.content}
+                      </div>
+                      {m.actions?.map((a, ai) => {
+                        const key = `${i}:${ai}`;
+                        const state = applied[key];
+                        return (
+                          <div
+                            key={ai}
+                            style={{
+                              background: "#fffbeb",
+                              border: "1px solid #fde68a",
+                              borderRadius: 10,
+                              padding: "10px 12px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
+                          >
+                            <span style={{ flex: 1, fontSize: 12.5, color: "#0f172a", fontWeight: 600 }}>
+                              {a.label}
+                            </span>
+                            {state === "done" ? (
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#16a34a" }}>✓ Fatto</span>
+                            ) : state === "error" ? (
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>Errore</span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (!onApplyAction) return;
+                                  const r = onApplyAction(a);
+                                  setApplied((p) => ({ ...p, [key]: r.ok ? "done" : "error" }));
+                                }}
+                                style={{
+                                  background: "#b45309",
+                                  color: "#fff",
+                                  border: "none",
+                                  borderRadius: 8,
+                                  padding: "6px 14px",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Applica
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                   {sending && (
