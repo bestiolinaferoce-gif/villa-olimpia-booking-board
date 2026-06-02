@@ -455,12 +455,15 @@ export function BoardAssistant({
                     style={{
                       flex: 1,
                       resize: "none",
-                      border: "1px solid #e2e8f0",
+                      border: "1px solid #cbd5e1",
                       borderRadius: 8,
                       padding: "8px 10px",
                       fontSize: 13,
                       fontFamily: "inherit",
                       color: "#0f172a",
+                      background: "#ffffff",
+                      WebkitTextFillColor: "#0f172a",
+                      caretColor: "#0f172a",
                     }}
                   />
                   <button
