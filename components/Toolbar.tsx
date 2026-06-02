@@ -14,6 +14,7 @@ import {
   Plus,
   Printer,
   Upload,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -155,6 +156,15 @@ export function Toolbar({
           >
             <FileText size={15} />
             Crea preventivo
+          </Link>
+          <Link
+            href="/spese"
+            className="ghost-btn"
+            title="Apri la scheda Spese"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <Wallet size={15} />
+            Spese
           </Link>
           <button type="button" className="ghost-btn" onClick={onEmailImport}>
             <Mail size={15} />

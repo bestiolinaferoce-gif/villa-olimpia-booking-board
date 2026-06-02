@@ -113,7 +113,7 @@ async function syncProperty(
     if (idx === -1) {
       // Don't create a sync record if a manual entry already covers this lodge+period.
       // The operator has already entered the booking manually with the correct amounts.
-      const coveredByManual = updated.some(
+      const coveringIdx = updated.findIndex(
         (b) =>
           b.lodge === config.lodge &&
           b.dataOrigin !== "sync" &&
@@ -121,8 +121,27 @@ async function syncProperty(
           b.checkIn < event.dtend &&
           b.checkOut > event.dtstart
       );
-      if (coveredByManual) {
-        result.skipped++;
+      if (coveringIdx !== -1) {
+        // Fix A-1: il feed Airbnb copre un record manuale. Se le date del feed
+        // sono DIVERSE da quelle manuali, l'ospite potrebbe aver modificato il
+        // soggiorno: segnaliamo il record come "candidato aggiornamento date"
+        // (nota idempotente) invece di skippare in silenzio o duplicare.
+        const cb = updated[coveringIdx];
+        const datesDiffer = cb.checkIn !== event.dtstart || cb.checkOut !== event.dtend;
+        const marker = `⚠️ AIRBNB: date feed ${event.dtstart}→${event.dtend} diverse dal manuale (verifica)`;
+        const alreadyFlagged = (cb.notes ?? "").includes(
+          `⚠️ AIRBNB: date feed ${event.dtstart}→${event.dtend}`
+        );
+        if (datesDiffer && !alreadyFlagged) {
+          updated[coveringIdx] = {
+            ...cb,
+            notes: cb.notes ? `${cb.notes}\n${marker}` : marker,
+            updatedAt: now,
+          };
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
       } else {
         updated.push(icalEventToBooking(event, config.lodge, config.defaultGuestsCount));
         result.created++;

@@ -40,6 +40,13 @@ export async function PUT(
     const { id } = await params;
     const updates = (await req.json()) as Partial<Booking>;
     const current = await readKV();
+    // Fix P-1: non resuscitare un record già cancellato (tombstone).
+    if ((current.deletedIds ?? []).includes(id)) {
+      return NextResponse.json(
+        { ok: false, error: 'gone', reason: 'Record cancellato (tombstone): non aggiornabile.' },
+        { status: 410 }
+      );
+    }
     const idx = current.data.findIndex((b) => b.id === id);
     if (idx === -1) return NextResponse.json({ ok: false }, { status: 404 });
     const updated: Booking = {

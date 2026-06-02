@@ -105,10 +105,10 @@ export const villaContact = {
   /** URL sito ufficiale (senza barra finale). */
   websiteUrl: "https://villaolimpiacaporizzuto.com",
   /** Cifre internazionali senza + (es. "393331234567"). Stringa vuota = nessun link WhatsApp nel PDF. */
-  whatsappDigits: "",
+  whatsappDigits: "393335773390",
   /** Numero visualizzato testualmente. Stringa vuota = non mostrato nel PDF. */
-  phoneDisplay: "",
-  addressLine: "Capo Rizzuto (KR), Calabria",
+  phoneDisplay: "+39 333 577 3390 · +39 329 047 9193",
+  addressLine: "Località Capopiccolo, 88841 Isola di Capo Rizzuto (KR), Calabria",
   websiteNote: "Prenotazioni e informazioni su villaolimpiacaporizzuto.com, via email o WhatsApp.",
 } as const;
 
@@ -164,64 +164,96 @@ export const quoteDocument = {
     "Su richiesta via email è disponibile una sintesi in inglese della presente proposta.",
 } as const;
 
-/** Lodge: descrizioni + metadati strutturali solo se indicati dal gestore (no supposizioni). */
+/**
+ * Lodge: metadati strutturali e descrizioni allineati alla scheda ufficiale
+ * Villa Olimpia (sito villaolimpiacaporizzuto.com — fonte aggiornata).
+ * Capienza, camere e caratteristiche distintive verificate. floor = piano,
+ * sqm = metratura (dove dichiarata).
+ */
 export const quoteLodges = [
   {
     id: "Frangipane",
     name: "Frangipane",
     shortDescription:
-      "Fino a 6 posti letto. Ambiente luminoso e curato, ideale per chi cerca comfort e spazio.",
+      "Piano terra, 45 mq, 2 camere matrimoniali e veranda privata: fino a 6 ospiti, ideale per famiglie o gruppi.",
+    floor: "Piano terra",
+    sqm: 45,
     maxGuests: 6,
+    bedrooms: 2,
   },
   {
     id: "Fiordaliso",
     name: "Fiordaliso",
     shortDescription:
-      "Lodge accogliente con ambienti curati; disposizione interna e dotazioni confermate in struttura.",
+      "Piano terra con balcone vista piscina: ambienti luminosi, ideale per coppie e famiglie 2+2 (fino a 4 ospiti).",
+    floor: "Piano terra",
+    maxGuests: 4,
+    bedrooms: 1,
   },
   {
     id: "Giglio",
     name: "Giglio",
     shortDescription:
-      "Fino a 5 posti letto. Soluzione equilibrata per famiglie o piccoli gruppi.",
-    maxGuests: 5,
+      "Piano terra con due camere (una collegata) e gazebo esterno: 5/6 posti, perfetto per famiglie e piccoli gruppi.",
+    floor: "Piano terra",
+    maxGuests: 6,
+    bedrooms: 2,
   },
   {
     id: "Tulipano",
     name: "Tulipano",
     shortDescription:
-      "Ambiente riservato e curato; dettagli di layout e servizi su conferma diretta.",
+      "Piano terra con accesso diretto al giardino e patio privato, vicino alla piscina: fino a 4 ospiti.",
+    floor: "Piano terra",
+    maxGuests: 4,
+    bedrooms: 1,
   },
   {
     id: "Orchidea",
     name: "Orchidea",
     shortDescription:
-      "Dotazione con 2 bagni. Spazi armoniosi per un soggiorno comodo in villa.",
+      "Primo piano con doppi servizi (1 camera + 2 bagni) e vista mare: comfort raro, fino a 4 ospiti.",
+    floor: "Primo piano",
+    maxGuests: 4,
+    bedrooms: 1,
   },
   {
     id: "Lavanda",
     name: "Lavanda",
     shortDescription:
-      "Atmosfera rilassante tra gli spazi verdi della struttura; organizzazione interna su richiesta.",
+      "Primo piano con veranda e portico privati: soluzione tranquilla per coppie e piccole famiglie (fino a 4 ospiti).",
+    floor: "Primo piano",
+    maxGuests: 4,
+    bedrooms: 1,
   },
   {
     id: "Geranio",
     name: "Geranio",
     shortDescription:
-      "Soluzione completa con 2 camere da letto e 2 bagni; adatta a famiglie che cercano praticità.",
+      "Attico premium 65 mq: 2 camere, 2 bagni e 2 balconcini semipanoramici arredati. La soluzione di punta, fino a 6 ospiti.",
+    floor: "Attico",
+    sqm: 65,
+    maxGuests: 6,
     bedrooms: 2,
+    premium: true,
   },
   {
     id: "Gardenia",
     name: "Gardenia",
     shortDescription:
-      "Due balconi. Spazi armoniosi per un soggiorno rilassante con affaccio esterno.",
+      "Primo piano con 2 balconi vista mare Ionio: ambienti luminosi, ideale per coppie e famiglie 2+2 (fino a 4 ospiti).",
+    floor: "Primo piano",
+    maxGuests: 4,
+    bedrooms: 1,
   },
   {
     id: "Azalea",
     name: "Azalea",
     shortDescription:
-      "Terrazza semipanoramica. Soluzione elegante vicino agli spazi comuni e al verde.",
+      "Primo piano con terrazza panoramica vista mare: soluzione luminosa per coppie e famiglie 2+2 (fino a 4 ospiti).",
+    floor: "Primo piano",
+    maxGuests: 4,
+    bedrooms: 1,
   },
 ] as const;
 
@@ -247,32 +279,32 @@ export type LodgeQuoteProfile = {
 
 const LODGE_QUOTE_PROFILES = {
   Frangipane: {
-    premiumLead: "Lodge ampia e luminosa — la più capiente della villa, ideale per famiglie numerose.",
+    premiumLead: "Piano terra spazioso con due camere matrimoniali e veranda privata — ideale per famiglie e gruppi fino a 6 ospiti.",
     compositionDetail:
-      "Fino a 6 posti letto. Disposizione su più ambienti: zona giorno spaziosa, cucina attrezzata e camere da letto luminose. Layout pensato per gruppi che vogliono condividere gli spazi senza rinunciare al comfort.",
+      "45 mq al piano terra: due camere matrimoniali, zona giorno con cucina attrezzata e veranda privata. Soluzione comoda per famiglie o gruppi fino a 6 ospiti, con accesso facile e spazi ben distribuiti.",
     outdoorNote:
-      "Spazio esterno riservato alla lodge per relax all’aperto (dettagli su arredo esterno confermati in struttura).",
+      "Veranda privata per relax e pasti all’aperto, affacciata sul giardino della struttura.",
     distinctive: [
-      "Massima capienza tra le lodge (6 ospiti)",
-      "Ambienti luminosi e distribuzione su più stanze",
-      "Adatta a soggiorni di una settimana o più",
+      "Due camere matrimoniali (fino a 6 ospiti)",
+      "Veranda privata sul giardino",
+      "Piano terra comodo, ideale per soggiorni lunghi",
     ],
     amenities: [
       "Cucina completa attrezzata",
       "Climatizzazione",
-      "Bagni e camere secondo planimetria in struttura",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Giglio: {
-    premiumLead: "Tra le lodge più richieste: bilanciamento perfetto tra spazio notte, cucina e vita all’aperto.",
+    premiumLead: "Piano terra con due camere (una collegata) e gazebo esterno — 5/6 posti, perfetto per famiglie e piccoli gruppi.",
     compositionDetail:
-      "Fino a 5 posti letto. Due camere da letto (camera matrimoniale e camera con letto alla francese / una piazza e mezza), zona living, cucina ampia con spazio per la preparazione dei pasti e zona pranzo interna.",
+      "Piano terra con due camere da letto, di cui una collegata all’altra — distribuzione comoda per famiglie con bambini o gruppi che vogliono restare vicini (5/6 posti). Zona living, cucina ampia e zona pranzo interna. Vicino alla piscina.",
     outdoorNote:
-      "Spazio esterno con gazebo: ideale per colazioni e cene all’aperto nella stagione adatta.",
+      "Gazebo esterno dedicato: ideale per colazioni e cene all’aperto. A pochi passi dalla piscina.",
     distinctive: [
-      "Doppia camera da letto con distribuzione chiara per famiglie",
-      "Cucina generosa rispetto alla media lodge",
-      "Gazebo per uso esterno dedicato",
+      "Due camere, di cui una collegata (5/6 posti)",
+      "Gazebo esterno privato",
+      "Posizione comoda, vicino alla piscina",
     ],
     amenities: [
       "Cucina attrezzata con zona cottura e ripiani ampi",
@@ -281,115 +313,115 @@ const LODGE_QUOTE_PROFILES = {
     ],
   },
   Orchidea: {
-    premiumLead: "Layout compatto con doppio servizio: una camera e due bagni completi.",
+    premiumLead: "Primo piano con doppi servizi e vista mare: una camera e due bagni completi — un comfort raro a questo livello.",
     compositionDetail:
-      "Composizione con una camera da letto, due bagni completi, cucina attrezzata e zona giorno. Soluzione pensata per chi privilegia praticità mattutina e comfort in bagno per più ospiti.",
-    outdoorNote: null,
+      "Primo piano con una camera da letto, due bagni completi, cucina attrezzata e zona giorno, con vista mare. Soluzione pensata per chi privilegia praticità e comfort in bagno per più ospiti (fino a 4).",
+    outdoorNote: "Affaccio con vista mare dal primo piano.",
     distinctive: [
-      "Due bagni completi con una sola camera da letto",
-      "Ottima per coppie che ospitano occasionalmente altri ospiti",
-      "Spazi armoniosi e curati in contesto villa",
+      "Doppi servizi (1 camera + 2 bagni): comfort raro",
+      "Vista mare dal primo piano",
+      "Ideale per coppie e famiglie 2+2",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Secondo bagno con doccia / servizi secondo scheda struttura",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Geranio: {
-    premiumLead: "Due camere e due bagni: organizzazione familiare senza compromessi.",
+    premiumLead: "Attico premium 65 mq: 2 camere, 2 bagni e 2 balconcini semipanoramici arredati — la soluzione di punta di Villa Olimpia, fino a 6 ospiti.",
     compositionDetail:
-      "Due camere da letto e due bagni, cucina attrezzata e zona giorno. Distribuzione classica per famiglie con bambini o due coppie che viaggiano insieme.",
-    outdoorNote: null,
+      "Attico di 65 mq con due camere da letto, due bagni, cucina attrezzata e zona giorno. Due balconcini semipanoramici arredati. Soluzione premium della villa: posizione elevata, maggiore riservatezza e ambienti ampi, fino a 6 ospiti.",
+    outdoorNote: "Due balconcini semipanoramici arredati, affacciati sul contesto della struttura.",
     distinctive: [
-      "Simmetria 2 camere / 2 bagni",
-      "Praticità per soggiorni di media durata",
-      "Ambiente riservato all’interno della villa",
+      "Attico premium: la soluzione di punta della villa",
+      "65 mq, 2 camere e 2 bagni (fino a 6 ospiti)",
+      "Due balconcini semipanoramici arredati",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Dotazioni camere e bagni secondo scheda lodge",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Gardenia: {
-    premiumLead: "Luce e aria: due balconi per godere del contesto verde della struttura.",
+    premiumLead: "Primo piano luminoso con due balconi vista mare Ionio — ideale per coppie e famiglie 2+2.",
     compositionDetail:
-      "Lodge con due balconi affacciati sugli spazi esterni della proprietà, cucina attrezzata, zona giorno e camere da letto curate. Pensata per chi ama alternare vita in lodge e momenti all’aperto sul proprio balcone.",
-    outdoorNote: "Due balconi privativi (esposizione e arredo secondo planimetria in struttura).",
+      "Primo piano con due balconi affacciati sul mare Ionio, cucina attrezzata, zona giorno e camera curata. Ambienti luminosi pensati per chi ama alternare vita in lodge e momenti all’aperto sul proprio balcone (fino a 4 ospiti).",
+    outdoorNote: "Due balconi con vista sul mare Ionio.",
     distinctive: [
-      "Doppio balcone",
-      "Atmosfera luminosa",
-      "Vicinanza agli spazi comuni e al verde della villa",
+      "Due balconi con vista mare Ionio",
+      "Ambienti luminosi",
+      "Ideale per coppie e famiglie 2+2",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Accesso esterno su due livelli balcone",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Azalea: {
-    premiumLead: "Terrazza semipanoramica: carattere forte e vista aperta sul contesto.",
+    premiumLead: "Primo piano con terrazza panoramica vista mare: luminosa e ben posizionata, per coppie e famiglie 2+2.",
     compositionDetail:
-      "Lodge con terrazza semipanoramica, cucina attrezzata, zona notte e giorno organizzata per soggiorni rilassanti. Posizione privilegiata rispetto agli spazi comuni e al verde.",
-    outdoorNote: "Terrazza semipanoramica attrezzata per relax all’aperto (dettagli in struttura).",
+      "Primo piano con terrazza panoramica affacciata sul mare, cucina attrezzata, zona notte e giorno organizzata per soggiorni rilassanti. Soluzione luminosa e ben posizionata (fino a 4 ospiti).",
+    outdoorNote: "Terrazza panoramica con vista mare, attrezzata per il relax all’aperto.",
     distinctive: [
-      "Terrazza con respiro panoramico",
-      "Eleganza dell’insieme architettonico",
-      "Adatta a coppie e piccoli nuclei",
+      "Terrazza panoramica con vista mare",
+      "Ambiente luminoso ed elegante",
+      "Ideale per coppie e famiglie 2+2",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Spazio esterno ampio sulla terrazza",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Tulipano: {
-    premiumLead: "Lodge riservata, curata nei dettagli — perfetta per chi cerca tranquillità.",
+    premiumLead: "Piano terra con accesso diretto al giardino e patio privato, a pochi passi dalla piscina.",
     compositionDetail:
-      "Ambiente riservato e curato; disposizione interna (camere, bagni, cucina) e dotazioni confermate al check-in secondo scheda struttura. Capienza e layout ottimali per nuclei contenuti.",
-    outdoorNote: null,
+      "Piano terra con accesso diretto al giardino e patio privato, cucina attrezzata e zona notte. Posizione comoda vicino alla piscina, ideale per famiglie e coppie (fino a 4 ospiti).",
+    outdoorNote: "Patio privato con accesso diretto al giardino, vicino alla piscina.",
     distinctive: [
-      "Atmosfera intima e ordinata",
-      "Ideale per soggiorni brevi o romantici",
-      "Gestione diretta Villa Olimpia",
+      "Accesso diretto al giardino + patio privato",
+      "Posizione comoda vicino alla piscina",
+      "Ideale per famiglie e coppie",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Layout interno su conferma in struttura",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Lavanda: {
-    premiumLead: "Tra il verde della villa: lodge dalla forte identità rilassante.",
+    premiumLead: "Primo piano con veranda e portico privati: soluzione tranquilla per coppie e piccole famiglie.",
     compositionDetail:
-      "Posizionata in stretto contatto con gli spazi verdi del complesso; interni curati con cucina attrezzata e zona notte. Organizzazione precisa delle stanze comunicata in fase di prenotazione / check-in.",
-    outdoorNote: "Contesto verde immediato intorno alla lodge.",
+      "Primo piano con veranda e portico privati, cucina attrezzata e zona notte. Ambiente riservato e tranquillo, ideale per coppie e piccole famiglie (fino a 4 ospiti).",
+    outdoorNote: "Veranda e portico privati per il relax all’aperto.",
     distinctive: [
-      "Forte legame con giardino e natura circostante",
-      "Atmosfera distensiva",
-      "Adatta a chi ama quiete e outdoor",
+      "Veranda e portico privati",
+      "Atmosfera tranquilla e riservata",
+      "Ideale per coppie e piccole famiglie",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Scheda dotazioni completa in struttura",
+      "Wi-Fi e posto auto riservato",
     ],
   },
   Fiordaliso: {
-    premiumLead: "Accoglienza classica Villa Olimpia in una lodge dagli interni curati.",
+    premiumLead: "Piano terra con balcone vista piscina: ambienti luminosi per coppie e famiglie 2+2.",
     compositionDetail:
-      "Lodge accogliente con ambienti ordinati; numero di camere, bagni e disposizione esatta secondo planimetria consegnata in struttura. Adatta a coppie e piccoli gruppi in base alla capienza indicata al momento della conferma.",
-    outdoorNote: null,
+      "Piano terra con balcone affacciato sulla piscina, cucina attrezzata, zona giorno e camera luminosa. Soluzione ideale per coppie e famiglie 2+2 (fino a 4 ospiti).",
+    outdoorNote: "Balcone con vista sulla piscina.",
     distinctive: [
-      "Interni curati e funzionali",
-      "Ottimo rapporto qualità / semplicità d’uso",
-      "Supporto gestione diretta durante il soggiorno",
+      "Balcone vista piscina",
+      "Ambienti luminosi e ordinati",
+      "Ideale per coppie e famiglie 2+2",
     ],
     amenities: [
       "Cucina attrezzata",
       "Climatizzazione",
-      "Dotazioni conformi alla scheda lodge",
+      "Wi-Fi e posto auto riservato",
     ],
   },
 } as const satisfies Record<QuoteLodgeId, LodgeQuoteProfile>;
@@ -412,20 +444,40 @@ export function lodgeQuotePresentation(lodge: QuoteLodge): {
   };
 }
 
-/** Riga riassuntiva capienza / camere (solo campi presenti sulla lodge). */
+/** Riga riassuntiva strutturale (piano · metratura · capienza · camere). */
 export function lodgeStructuralLine(lodge: QuoteLodge): string | null {
   const row = lodge as Record<string, unknown>;
   const parts: string[] = [];
+  const floor = row.floor;
+  const sqm = row.sqm;
   const mg = row.maxGuests;
   const br = row.bedrooms;
+  if (typeof floor === "string" && floor.trim()) {
+    parts.push(floor);
+  }
+  if (typeof sqm === "number" && Number.isFinite(sqm)) {
+    parts.push(`${sqm} mq`);
+  }
   if (typeof mg === "number" && Number.isFinite(mg)) {
-    parts.push(`Capienza massima: ${mg} posti letto`);
+    parts.push(`fino a ${mg} ospiti`);
   }
   if (typeof br === "number" && Number.isFinite(br)) {
-    parts.push(`${br} camere da letto`);
+    parts.push(br === 1 ? "1 camera da letto" : `${br} camere da letto`);
   }
   return parts.length ? parts.join(" · ") : null;
 }
+
+/**
+ * Mappa digitale della villa mostrata nei preventivi.
+ * `src` punta a un file in public/. Se il file non esiste, la sezione si
+ * nasconde automaticamente (onError). Per attivarla: copia il PNG in
+ * public/mappa-villa.png (o cambia src qui).
+ */
+export const villaMap = {
+  src: "/mappa-villa.png",
+  caption:
+    "Disposizione dei 9 lodge di Villa Olimpia a Capopiccolo, con piscina, giardino e accesso alla Spiaggia dei Gigli (~100 m).",
+} as const;
 
 export const villaIntro = {
   title: "Perché Villa Olimpia",
@@ -434,13 +486,13 @@ export const villaIntro = {
 } as const;
 
 export const villaStructure = {
-  pool: "Area piscina per relax e tempo libero (utilizzo secondo regolamento interno e stagionalità).",
-  garden: "Giardino e spazi esterni curati per vivere l’aperto in sicurezza.",
+  pool: "Piscina della struttura, condivisa tra gli ospiti dei lodge, con solarium e gazebo (utilizzo secondo regolamento interno e stagionalità).",
+  garden: "Giardino di circa 3.000 mq e spazi esterni curati per vivere l’aperto in sicurezza.",
   /** Contesto verde struttura (cifra indicativa del complesso; verificare in struttura se necessario). */
   gardenScale:
     "Il complesso si sviluppa tra ampi spazi verdi (ordine di grandezza indicativo ~3.000 mq di giardino e aree esterne condivise e curate), ideali per relax tra una giornata al mare e il rientro in lodge.",
   beach:
-    "Vicinanza al litorale ionico e alle spiagge della zona, con riferimento all’area di Spiaggia dei Gigli; tempi di percorrenza verso la spiaggia prescelta variabili in base alla destinazione.",
+    "A circa 100 metri dalla Spiaggia dei Gigli (~1 minuto a piedi), nell'Area Marina Protetta di Capo Rizzuto — Bandiera Blu 2026. Nei dintorni: Spiaggia di Capo Piccolo (5 min auto), Spiagge Rosse (10 min), Le Castella (20 min).",
   territory:
     "Capo Rizzuto (KR): territorio tra mare Ionio, natura e borghi. In prossimità: Area Marina Protetta Capo Rizzuto, il borgo e il castello di Le Castella, itinerari verso spiagge e servizi locali.",
   sea: "Posizione favorevole verso il litorale ionico; tempi di percorrenza verso spiagge e punti di interesse variabili in base alla destinazione scelta.",
@@ -451,8 +503,8 @@ export const villaTerritoryPoints = [
   {
     key: "gigli",
     icon: "waves" as const,
-    title: "Spiaggia dei Gigli",
-    text: "Riferimento balneare noto sulla costa ionica calabrese; distanze e tempi di percorrenza dipendono dal punto esatto prescelto.",
+    title: "Spiaggia dei Gigli — a ~100 m",
+    text: "La struttura dista circa 100 metri dalla Spiaggia dei Gigli (~1 minuto a piedi), nell'Area Marina Protetta di Capo Rizzuto — Bandiera Blu 2026.",
   },
   {
     key: "amp",
