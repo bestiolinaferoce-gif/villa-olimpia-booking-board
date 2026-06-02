@@ -13,7 +13,7 @@ import { Toast } from "@/components/Toast";
 import { Toolbar } from "@/components/Toolbar";
 import { PasswordGate } from "@/components/PasswordGate";
 import { KPIPanel } from "@/components/KPIPanel";
-import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types";
+import { type Booking, type BookingAttachment, type BookingInput, type Lodge, LODGES } from "@/lib/types";
 import { useBookingStore, type ImportMergeSkipDetail } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
@@ -196,6 +196,15 @@ export default function Home() {
       } else if (action.tool === "update_amounts") {
         if (typeof action.input.totalAmount === "number") payload.totalAmount = action.input.totalAmount;
         if (typeof action.input.depositAmount === "number") payload.depositAmount = action.input.depositAmount;
+      } else if (action.tool === "attach_to_booking") {
+        const att = action.input.attachment as BookingAttachment | undefined;
+        if (!att || !att.url) return { ok: false, message: "Nessun file allegato." };
+        const kind = action.input.kind;
+        const attachment: BookingAttachment = {
+          ...att,
+          kind: typeof kind === "string" ? (kind as BookingAttachment["kind"]) : att.kind,
+        };
+        payload.attachments = [...(booking.attachments ?? []), attachment];
       } else {
         return { ok: false, message: "Azione non riconosciuta." };
       }

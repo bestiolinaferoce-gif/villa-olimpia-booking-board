@@ -101,7 +101,11 @@ AZIONI OPERATIVE:
 - Usa questi strumenti SOLO quando Francesco ti chiede esplicitamente di fare/applicare una modifica (es. "incassa la caparra di X", "conferma l'opzione di Y", "cancella Z", "metti il totale di W a 1200").
 - Le azioni che proponi NON vengono eseguite subito: Francesco le conferma con un clic. Quindi, quando usi uno strumento, accompagna sempre con una frase che spiega cosa stai per fare.
 - Identifica la prenotazione giusta dal contesto (per lodge+ospite+date) e passa il suo id esatto. Se l'id è ambiguo o non lo trovi con certezza, NON usare lo strumento: chiedi conferma indicando la prenotazione.
-- Per semplici domande/riepiloghi rispondi solo a testo, senza strumenti.`;
+- Per semplici domande/riepiloghi rispondi solo a testo, senza strumenti.
+
+ALLEGATI:
+- Quando il messaggio dell'utente contiene "[File allegato: ...]", significa che ha caricato un documento o una ricevuta da archiviare nella scheda di una prenotazione.
+- Capisci dal testo dell'utente a chi/quale prenotazione appartiene e usa lo strumento attach_to_booking con il bookingId giusto e, se chiaro, il tipo (documento/ricevuta/contratto). Se non è chiaro a quale prenotazione, chiedi prima di proporre l'azione.`;
 
 // Strumenti che l'assistente può proporre (eseguiti lato client previa conferma).
 const ASSISTANT_TOOLS = [
@@ -139,6 +143,19 @@ const ASSISTANT_TOOLS = [
       required: ["bookingId"],
     },
   },
+  {
+    name: "attach_to_booking",
+    description:
+      "Allega il file caricato dall'utente (documento, ricevuta, contratto) alla scheda della prenotazione giusta. Usa quando l'utente ha appena allegato un file e indica a chi/quale prenotazione appartiene.",
+    input_schema: {
+      type: "object",
+      properties: {
+        bookingId: { type: "string", description: "id esatto della prenotazione a cui allegare il file" },
+        kind: { type: "string", enum: ["documento", "ricevuta", "contratto", "altro"] },
+      },
+      required: ["bookingId"],
+    },
+  },
 ];
 
 const ACTION_LABELS: Record<string, (input: Record<string, unknown>, who: string) => string> = {
@@ -150,6 +167,7 @@ const ACTION_LABELS: Record<string, (input: Record<string, unknown>, who: string
     if (typeof i.depositAmount === "number") parts.push(`caparra ${eur(i.depositAmount as number)}`);
     return `Aggiorna ${parts.join(" e ") || "importi"} — ${who}`;
   },
+  attach_to_booking: (i, who) => `Allega ${i.kind ? `${i.kind} ` : "file "}alla prenotazione — ${who}`,
 };
 
 export async function POST(req: NextRequest) {

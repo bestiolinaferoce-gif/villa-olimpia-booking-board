@@ -417,6 +417,40 @@ export function BookingDialog({
                 <textarea value={form.notes} onChange={(e) => change("notes", e.target.value)} rows={3} />
               </label>
             </div>
+            {booking?.attachments && booking.attachments.length > 0 && (
+              <div className="form-section">
+                <p className="form-section-title">Documenti allegati</p>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {booking.attachments.map((a, i) => (
+                    <a
+                      key={i}
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        textDecoration: "none",
+                        border: "1px solid var(--border, #e2e8f0)",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontSize: 13,
+                        color: "inherit",
+                      }}
+                    >
+                      <span style={{ color: "#b45309" }}>📎</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {a.name}
+                      </span>
+                      {a.kind ? (
+                        <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase" }}>{a.kind}</span>
+                      ) : null}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="form-section">
               <p className="form-section-title">Stato Pratica Adempimenti</p>
               <div className="form-grid">

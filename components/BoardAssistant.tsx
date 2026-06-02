@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Sparkles, X, RefreshCw, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, X, RefreshCw, ChevronRight, Paperclip } from "lucide-react";
 import type { Booking } from "@/lib/types";
 import type { BookingConflict } from "@/lib/reconciliation";
 import { analyzeBoard, type BoardInsight, type InsightSeverity } from "@/lib/boardInsights";
@@ -62,6 +62,46 @@ export function BoardAssistant({
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, "done" | "error">>({});
+  const [pendingFile, setPendingFile] = useState<AssistantAction["input"] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleAttach(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setChatError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", files[0]);
+      const headers: Record<string, string> = {};
+      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+      if (token) headers["X-Internal-Token"] = token;
+      const res = await fetch("/api/upload", { method: "POST", headers, body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setChatError(data.message || "Upload non riuscito.");
+      } else {
+        setPendingFile(data.attachment);
+      }
+    } catch {
+      setChatError("Errore durante l'upload del file.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function applyAction(a: AssistantAction, key: string) {
+    if (!onApplyAction) return;
+    // Per gli allegati, inietta il file caricato nell'azione.
+    const action =
+      a.tool === "attach_to_booking" && pendingFile
+        ? { ...a, input: { ...a.input, attachment: pendingFile } }
+        : a;
+    const r = onApplyAction(action);
+    setApplied((p) => ({ ...p, [key]: r.ok ? "done" : "error" }));
+    if (r.ok && a.tool === "attach_to_booking") setPendingFile(null);
+  }
 
   const analysis = useMemo(
     () => analyzeBoard(bookings, conflicts, new Date()),
@@ -71,9 +111,11 @@ export function BoardAssistant({
 
   async function sendChat() {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && !pendingFile) || sending) return;
     setChatError(null);
-    const next = [...chat, { role: "user" as const, content: text }];
+    const marker = pendingFile ? `\n[File allegato: ${pendingFile.name}]` : "";
+    const content = `${text}${marker}`.trim();
+    const next = [...chat, { role: "user" as const, content }];
     setChat(next);
     setInput("");
     setSending(true);
@@ -465,11 +507,7 @@ export function BoardAssistant({
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>Errore</span>
                             ) : (
                               <button
-                                onClick={() => {
-                                  if (!onApplyAction) return;
-                                  const r = onApplyAction(a);
-                                  setApplied((p) => ({ ...p, [key]: r.ok ? "done" : "error" }));
-                                }}
+                                onClick={() => applyAction(a, key)}
                                 style={{
                                   background: "#b45309",
                                   color: "#fff",
@@ -510,48 +548,95 @@ export function BoardAssistant({
                     </div>
                   )}
                 </div>
-                <div style={{ borderTop: "1px solid #e2e8f0", padding: 12, display: "flex", gap: 8, background: "#fff" }}>
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendChat();
-                      }
-                    }}
-                    placeholder="Scrivi qui… (Invio per inviare)"
-                    rows={2}
-                    style={{
-                      flex: 1,
-                      resize: "none",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: 8,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      fontFamily: "inherit",
-                      color: "#0f172a",
-                      background: "#ffffff",
-                      WebkitTextFillColor: "#0f172a",
-                      caretColor: "#0f172a",
-                    }}
-                  />
-                  <button
-                    onClick={sendChat}
-                    disabled={sending || !input.trim()}
-                    style={{
-                      background: sending || !input.trim() ? "#cbd5e1" : "#0f2742",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "0 16px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: sending || !input.trim() ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    Invia
-                  </button>
+                <div style={{ borderTop: "1px solid #e2e8f0", padding: 12, display: "flex", flexDirection: "column", gap: 8, background: "#fff" }}>
+                  {pendingFile && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <Paperclip size={14} style={{ color: "#b45309" }} />
+                      <span style={{ flex: 1, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {String(pendingFile.name)}
+                      </span>
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>pronto da archiviare</span>
+                      <button
+                        onClick={() => setPendingFile(null)}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input ref={fileRef} type="file" hidden onChange={(e) => handleAttach(e.target.files)} />
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                      title="Allega documento o ricevuta"
+                      style={{
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 8,
+                        width: 40,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: uploading ? "wait" : "pointer",
+                        color: "#b45309",
+                      }}
+                    >
+                      {uploading ? <RefreshCw size={16} className="spin" /> : <Paperclip size={16} />}
+                    </button>
+                    <textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendChat();
+                        }
+                      }}
+                      placeholder="Scrivi qui… (Invio per inviare)"
+                      rows={2}
+                      style={{
+                        flex: 1,
+                        resize: "none",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontSize: 13,
+                        fontFamily: "inherit",
+                        color: "#0f172a",
+                        background: "#ffffff",
+                        WebkitTextFillColor: "#0f172a",
+                        caretColor: "#0f172a",
+                      }}
+                    />
+                    <button
+                      onClick={sendChat}
+                      disabled={sending || (!input.trim() && !pendingFile)}
+                      style={{
+                        background: sending || (!input.trim() && !pendingFile) ? "#cbd5e1" : "#0f2742",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "0 16px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: sending || (!input.trim() && !pendingFile) ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Invia
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
