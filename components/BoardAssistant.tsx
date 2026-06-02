@@ -45,12 +45,47 @@ export function BoardAssistant({
 }: BoardAssistantProps) {
   const [open, setOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [tab, setTab] = useState<"analisi" | "chat">("analisi");
+  const [chat, setChat] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const analysis = useMemo(
     () => analyzeBoard(bookings, conflicts, new Date()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [bookings, conflicts, nonce]
   );
+
+  async function sendChat() {
+    const text = input.trim();
+    if (!text || sending) return;
+    setChatError(null);
+    const next = [...chat, { role: "user" as const, content: text }];
+    setChat(next);
+    setInput("");
+    setSending(true);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+      if (token) headers["X-Internal-Token"] = token;
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ messages: next }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setChatError(data.message || "Assistente non disponibile.");
+      } else {
+        setChat((c) => [...c, { role: "assistant", content: data.reply as string }]);
+      }
+    } catch {
+      setChatError("Errore di rete verso l'assistente.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   // Auto-apertura all'avvio della board (una volta per giornata) se ci sono azioni.
   useEffect(() => {
@@ -194,6 +229,30 @@ export function BoardAssistant({
               </div>
             </header>
 
+            {/* Linguette: Analisi (gratis) / Chat AI (Claude) */}
+            <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
+              {(["analisi", "chat"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: tab === t ? "#0f2742" : "#94a3b8",
+                    borderBottom: tab === t ? "2px solid #0f2742" : "2px solid transparent",
+                  }}
+                >
+                  {t === "analisi" ? "Analisi" : "Chat AI"}
+                </button>
+              ))}
+            </div>
+
+            {tab === "analisi" && (
             <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "grid", gap: 10 }}>
               {/* Riquadro economico — distingue mese visualizzato vs valore complessivo */}
               <div
@@ -306,7 +365,125 @@ export function BoardAssistant({
                 );
               })}
             </div>
+            )}
 
+            {tab === "chat" && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "grid", gap: 10, alignContent: "start" }}>
+                  {chat.length === 0 && (
+                    <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>
+                      Chiedimi cosa vuoi sulla board. Esempi:
+                      <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                        {[
+                          "A chi manca la caparra e per quanto?",
+                          "Ci sono conflitti da risolvere?",
+                          "Riepilogo incassi di questo mese",
+                          "Quali check-in ho nei prossimi 7 giorni?",
+                        ].map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => setInput(q)}
+                            style={{
+                              textAlign: "left",
+                              border: "1px solid #e2e8f0",
+                              background: "#fff",
+                              borderRadius: 8,
+                              padding: "8px 10px",
+                              fontSize: 12,
+                              color: "#0f2742",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {chat.map((m, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        alignSelf: m.role === "user" ? "end" : "start",
+                        maxWidth: "85%",
+                        background: m.role === "user" ? "#0f2742" : "#fff",
+                        color: m.role === "user" ? "#fff" : "#0f172a",
+                        border: m.role === "user" ? "none" : "1px solid #e2e8f0",
+                        borderRadius: 12,
+                        padding: "9px 12px",
+                        fontSize: 13,
+                        lineHeight: 1.5,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {m.content}
+                    </div>
+                  ))}
+                  {sending && (
+                    <div style={{ color: "#94a3b8", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                      <RefreshCw size={14} className="spin" /> Sto pensando…
+                    </div>
+                  )}
+                  {chatError && (
+                    <div
+                      style={{
+                        background: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#b91c1c",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        fontSize: 12.5,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {chatError}
+                    </div>
+                  )}
+                </div>
+                <div style={{ borderTop: "1px solid #e2e8f0", padding: 12, display: "flex", gap: 8, background: "#fff" }}>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChat();
+                      }
+                    }}
+                    placeholder="Scrivi qui… (Invio per inviare)"
+                    rows={2}
+                    style={{
+                      flex: 1,
+                      resize: "none",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                      color: "#0f172a",
+                    }}
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={sending || !input.trim()}
+                    style={{
+                      background: sending || !input.trim() ? "#cbd5e1" : "#0f2742",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      padding: "0 16px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: sending || !input.trim() ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Invia
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tab === "analisi" && (
             <footer
               style={{
                 padding: "10px 16px",
@@ -319,7 +496,9 @@ export function BoardAssistant({
               Analisi generata il{" "}
               {new Date(analysis.generatedAt).toLocaleString("it-IT")}
             </footer>
+            )}
           </aside>
+          <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
     </>
