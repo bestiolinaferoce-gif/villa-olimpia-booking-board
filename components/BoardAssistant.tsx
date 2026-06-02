@@ -22,9 +22,27 @@ type BoardAssistantProps = {
   bookings: Booking[];
   conflicts: BookingConflict[];
   onOpenBooking: (booking: Booking) => void;
+  /** Etichetta del mese mostrato in board (es. "giugno 2026"). */
+  monthLabel?: string;
+  /** Revenue del mese mostrato in board (stesso valore del KPIPanel, pro-rata notti). */
+  monthRevenue?: number;
 };
 
-export function BoardAssistant({ bookings, conflicts, onOpenBooking }: BoardAssistantProps) {
+function eur0(value: number): string {
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+export function BoardAssistant({
+  bookings,
+  conflicts,
+  onOpenBooking,
+  monthLabel,
+  monthRevenue,
+}: BoardAssistantProps) {
   const [open, setOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
 
@@ -177,7 +195,48 @@ export function BoardAssistant({ bookings, conflicts, onOpenBooking }: BoardAssi
             </header>
 
             <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "grid", gap: 10 }}>
-              {analysis.insights.map((insight) => {
+              {/* Riquadro economico — distingue mese visualizzato vs valore complessivo */}
+              <div
+                style={{
+                  background: "#0f2742",
+                  color: "#fff",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                {typeof monthRevenue === "number" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+                      Revenue {monthLabel ?? "mese in corso"} (come da board)
+                    </span>
+                    <strong style={{ fontSize: 18 }}>{eur0(monthRevenue)}</strong>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+                    Valore confermato — tutte le date
+                  </span>
+                  <strong style={{ fontSize: 18 }}>{eur0(analysis.economics.confirmedRevenue)}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+                    Caparre incassate · Saldo da incassare
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    {eur0(analysis.economics.depositsReceived)} · {eur0(analysis.economics.outstanding)}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
+                  Il dato di board è il fatturato del solo mese visualizzato (ripartito per notte). Qui
+                  sopra trovi anche il valore complessivo di tutte le prenotazioni confermate.
+                </p>
+              </div>
+
+              {analysis.insights
+                .filter((i) => i.id !== "economia")
+                .map((insight) => {
                 const s = SEVERITY_STYLE[insight.severity];
                 const clickable = insight.bookingIds.length > 0;
                 return (

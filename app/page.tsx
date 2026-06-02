@@ -424,6 +424,8 @@ export default function Home() {
         bookings={canonicalBookings}
         conflicts={reconciled.conflicts}
         onOpenBooking={openEditBooking}
+        monthLabel={format(monthDate, "MMMM yyyy")}
+        monthRevenue={monthKPIs.revenue}
       />
 
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
