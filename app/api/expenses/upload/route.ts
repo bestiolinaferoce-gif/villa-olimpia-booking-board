@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { put } from "@vercel/blob";
 import { bookingWriteAuthError } from "@/lib/bookingsApiAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN ?? "";
-// Versione API Blob (allineata al client ufficiale @vercel/blob).
-const BLOB_API_VERSION = "11";
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB per documento
 
 function sanitizeName(name: string): string {
@@ -26,6 +24,7 @@ export async function POST(req: NextRequest) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
 
+  const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN ?? "";
   if (!BLOB_TOKEN) {
     return NextResponse.json(
       {
@@ -58,48 +57,22 @@ export async function POST(req: NextRequest) {
   }
 
   const safeName = sanitizeName(file.name || "documento");
-  const pathname = `spese/${Date.now()}-${safeName}`;
   const contentType = file.type || "application/octet-stream";
 
   try {
-    const body = Buffer.from(await file.arrayBuffer());
-    const blobRes = await fetch(
-      `https://blob.vercel-storage.com/${encodeURI(pathname)}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${BLOB_TOKEN}`,
-          "x-api-version": BLOB_API_VERSION,
-          "x-content-type": contentType,
-          "x-add-random-suffix": "1",
-          "content-type": contentType,
-        },
-        body,
-      }
-    );
-
-    if (!blobRes.ok) {
-      const detail = await blobRes.text().catch(() => "");
-      return NextResponse.json(
-        { ok: false, error: "blob_upload_failed", status: blobRes.status, detail },
-        { status: 502 }
-      );
-    }
-
-    const data = (await blobRes.json()) as {
-      url: string;
-      downloadUrl?: string;
-      pathname?: string;
-      contentType?: string;
-    };
-
+    const blob = await put(`spese/${safeName}`, file, {
+      access: "public",
+      token: BLOB_TOKEN,
+      addRandomSuffix: true,
+      contentType,
+    });
     return NextResponse.json({
       ok: true,
       attachment: {
         name: file.name || safeName,
-        url: data.url,
+        url: blob.url,
         size: file.size,
-        contentType: data.contentType || contentType,
+        contentType: blob.contentType || contentType,
         uploadedAt: new Date().toISOString(),
       },
     });
