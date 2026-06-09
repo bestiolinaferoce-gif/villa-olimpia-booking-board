@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSessionToken,
+  getLoginPassword,
   getServerWriteSecret,
   safeEqual,
   SESSION_COOKIE,
@@ -10,13 +11,14 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Login con password (stesso valore di API_WRITE_SECRET/CRON_SECRET su Vercel). */
+/** Login con APP_PASSWORD (password del gestore) o, in fallback, il token API. */
 export async function POST(req: NextRequest) {
   const secret = getServerWriteSecret();
   if (!secret) {
     // Nessun secret configurato (es. sviluppo locale): nessun login necessario.
     return NextResponse.json({ ok: true, open: true });
   }
+  const loginPassword = getLoginPassword();
 
   let password = "";
   try {
@@ -26,7 +28,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
   }
 
-  if (!password || !safeEqual(password, secret)) {
+  const valid =
+    password.length > 0 &&
+    (safeEqual(password, loginPassword) || safeEqual(password, secret));
+  if (!valid) {
     return NextResponse.json({ ok: false, error: "wrong_password" }, { status: 401 });
   }
 

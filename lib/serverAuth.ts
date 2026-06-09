@@ -22,6 +22,19 @@ export function getServerWriteSecret(): string {
   ).trim();
 }
 
+/**
+ * Password di accesso alla board (pagina /login), separata dal token API.
+ * APP_PASSWORD è la password "umana" scelta dal gestore; in sua assenza
+ * vale il token API. Letta SOLO lato server.
+ */
+export function getLoginPassword(): string {
+  return (
+    process.env.APP_PASSWORD ??
+    process.env.NEXT_PUBLIC_APP_PASSWORD ??
+    getServerWriteSecret()
+  ).trim();
+}
+
 function sign(secret: string, message: string): string {
   return createHmac("sha256", secret).update(message).digest("hex");
 }
