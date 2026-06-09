@@ -1,57 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
+import { bookingReadAuthError, bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
 import type { Booking } from '@/lib/types';
+import {
+  capDeletedIds,
+  casWriteBookingsKV,
+  kvConfigured,
+  readBookingsKV,
+  type KVBookingsPayload,
+} from '@/lib/kvCas';
 import {
   notifyN8NBookingEvents,
   type N8nBookingEventName,
   type N8nBookingEventPayload,
 } from '@/lib/n8nBookingWebhook';
 
-const BASE = process.env.KV_REST_API_URL ?? '';
-const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'vob_bookings';
-
-type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
-
 const PROPERTY = 'villa-olimpia';
 
-/**
- * Protezione LETTURA di /api/bookings.
- * Lascia passare:
- *  - il browser della board stessa (richiesta same-origin: Origin/Referer sul dominio del deploy)
- *  - chi presenta il token segreto in header X-Internal-Token (es. Cowork / automazioni)
- * Blocca tutto il resto con 403 (es. URL aperto a mano, scraper anonimi).
- * Fail-open: se nessun secret è configurato sul server, non blocca nulla (la board non si rompe mai).
- */
-function bookingReadAuthError(req: NextRequest): NextResponse | null {
-  const secret = (
-    process.env.NEXT_PUBLIC_API_WRITE_SECRET ??
-    process.env.API_WRITE_SECRET ??
-    process.env.CRON_SECRET ??
-    ''
-  ).trim();
-
-  // Nessun secret configurato → nessun enforcement (comportamento attuale, niente rischio).
-  if (!secret) return null;
-
-  // 1) Token corretto (Cowork, automazioni, cron).
-  const clientToken = (req.headers.get('x-internal-token') ?? '').trim();
-  if (clientToken === secret) return null;
-
-  // 2) Richiesta same-origin dal browser della board.
-  const host = (req.headers.get('host') ?? '').trim();
-  const origin = req.headers.get('origin') ?? '';
-  const referer = req.headers.get('referer') ?? '';
-  if (host && (origin.includes(host) || referer.includes(host))) return null;
-
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-}
-
+/** Notti su date-only YYYY-MM-DD in UTC: immune da timezone del server e DST. */
 function calculateNights(checkIn: string, checkOut: string) {
-  const start = new Date(checkIn);
-  const end = new Date(checkOut);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const toUtc = (iso: string): number => {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    if (!y || !m || !d) return NaN;
+    return Date.UTC(y, m - 1, d);
+  };
+  const start = toUtc(checkIn);
+  const end = toUtc(checkOut);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.round((end - start) / 86_400_000));
 }
 
 function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookingEventPayload {
@@ -100,12 +75,13 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
       events.push(toBookingEvent('BOOKING_CREATED', booking));
       continue;
     }
-    if (!previous.depositReceived && booking.depositReceived) {
-      events.push(toBookingEvent('DEPOSIT_RECEIVED', booking));
-      continue;
-    }
+    // La cancellazione ha precedenza sulla caparra (vedi merge-local).
     if (previous.status !== 'cancelled' && booking.status === 'cancelled') {
       events.push(toBookingEvent('BOOKING_CANCELLED', booking));
+      continue;
+    }
+    if (!previous.depositReceived && booking.depositReceived) {
+      events.push(toBookingEvent('DEPOSIT_RECEIVED', booking));
       continue;
     }
     if (hasBookingChanged(previous, booking)) {
@@ -122,65 +98,56 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
   return events;
 }
 
-async function readKV(): Promise<{ payload: KVPayload | null; raw: string | null }> {
-  if (!BASE || !TOKEN) return { payload: null, raw: null };
-  const res = await fetch(`${BASE}/get/${KEY}`, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-    cache: 'no-store',
-  });
-  const json = (await res.json()) as { result: string | null };
-  if (!json.result) return { payload: null, raw: null };
-  const parsed = JSON.parse(json.result) as KVPayload | Booking[];
-  if (Array.isArray(parsed)) {
-    return { payload: { v: 1, ts: new Date().toISOString(), data: parsed }, raw: json.result };
-  }
-  return { payload: parsed as KVPayload, raw: json.result };
-}
-
 export async function GET(req: NextRequest) {
   const authErr = bookingReadAuthError(req);
   if (authErr) return authErr;
 
-  if (!BASE || !TOKEN) return NextResponse.json({ v: 0, ts: '', data: [] });
+  if (!kvConfigured()) return NextResponse.json({ v: 0, ts: '', data: [] });
   try {
-    const { payload } = await readKV();
+    const payload = await readBookingsKV();
     return NextResponse.json(payload ?? { v: 0, ts: '', data: [] });
   } catch {
     return NextResponse.json({ v: 0, ts: '', data: [] });
   }
 }
 
+const CAS_MAX_RETRIES = 4;
+
 export async function POST(req: NextRequest) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
 
-  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+  if (!kvConfigured()) return kvNotConfiguredResponse();
   try {
     const body = (await req.json()) as Booking[] | { bookings: Booking[]; deletedIds?: string[] };
     const requestedBookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
-    const { payload: current } = await readKV();
-    const deletedIds = Array.from(
-      new Set([
-        ...(current?.deletedIds ?? []),
-        ...(!Array.isArray(body) && Array.isArray(body.deletedIds) ? body.deletedIds : []),
-      ])
+    const requestDeletedIds = !Array.isArray(body) && Array.isArray(body.deletedIds) ? body.deletedIds : [];
+
+    for (let attempt = 0; attempt < CAS_MAX_RETRIES; attempt++) {
+      const current = await readBookingsKV();
+      const deletedIds = Array.from(
+        new Set([...(current?.deletedIds ?? []), ...requestDeletedIds])
+      );
+      const deletedSet = new Set(deletedIds);
+      const bookings = requestedBookings.filter((booking) => !deletedSet.has(booking.id));
+      const events = collectBookingEvents(current?.data ?? [], bookings);
+      const newPayload: KVBookingsPayload = {
+        v: (current?.v ?? 0) + 1,
+        ts: new Date().toISOString(),
+        data: bookings,
+        deletedIds: capDeletedIds(deletedIds),
+      };
+      const written = await casWriteBookingsKV(current?.v ?? 0, newPayload);
+      if (!written) continue;
+
+      await notifyN8NBookingEvents(events, 'api/bookings');
+      return NextResponse.json({ ok: true, v: newPayload.v, ts: newPayload.ts, syncedEvents: events.length });
+    }
+
+    return NextResponse.json(
+      { ok: false, error: 'conflict: troppe scritture concorrenti, riprova' },
+      { status: 409 }
     );
-    const deletedSet = new Set(deletedIds);
-    const bookings = requestedBookings.filter((booking) => !deletedSet.has(booking.id));
-    const events = collectBookingEvents(current?.data ?? [], bookings);
-    const newPayload: KVPayload = {
-      v: (current?.v ?? 0) + 1,
-      ts: new Date().toISOString(),
-      data: bookings,
-      deletedIds,
-    };
-    await fetch(`${BASE}/pipeline`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([['SET', KEY, JSON.stringify(newPayload)]]),
-    });
-    await notifyN8NBookingEvents(events, 'api/bookings');
-    return NextResponse.json({ ok: true, v: newPayload.v, ts: newPayload.ts, syncedEvents: events.length });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }

@@ -2,28 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { bookingWriteAuthError, kvNotConfiguredResponse } from "@/lib/bookingsApiAuth";
 import type { Booking } from "@/lib/types";
 import {
+  capDeletedIds,
+  casWriteBookingsKV,
+  kvConfigured,
+  readBookingsKV,
+  type KVBookingsPayload,
+} from "@/lib/kvCas";
+import {
   notifyN8NBookingEvents,
   type N8nBookingEventName,
   type N8nBookingEventPayload,
 } from "@/lib/n8nBookingWebhook";
 
-const BASE = process.env.KV_REST_API_URL ?? "";
-const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
-const KEY = "vob_bookings";
 const PROPERTY = "villa-olimpia";
-
-type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
 
 function bookingUpdatedMs(booking: Booking): number {
   const ts = Date.parse(booking.updatedAt || booking.createdAt || "");
   return Number.isFinite(ts) ? ts : 0;
 }
 
+/** Notti su date-only YYYY-MM-DD in UTC: immune da timezone del server e DST. */
 function calculateNights(checkIn: string, checkOut: string) {
-  const start = new Date(checkIn);
-  const end = new Date(checkOut);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const toUtc = (iso: string): number => {
+    const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+    if (!y || !m || !d) return NaN;
+    return Date.UTC(y, m - 1, d);
+  };
+  const start = toUtc(checkIn);
+  const end = toUtc(checkOut);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.round((end - start) / 86_400_000));
 }
 
 function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookingEventPayload {
@@ -72,12 +80,15 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
       events.push(toBookingEvent("BOOKING_CREATED", booking));
       continue;
     }
-    if (!previous.depositReceived && booking.depositReceived) {
-      events.push(toBookingEvent("DEPOSIT_RECEIVED", booking));
-      continue;
-    }
+    // La cancellazione ha precedenza: se nello stesso aggiornamento arrivano
+    // sia caparra che cancellazione, n8n deve ricevere BOOKING_CANCELLED
+    // (altrimenti partono automazioni di benvenuto per un ospite cancellato).
     if (previous.status !== "cancelled" && booking.status === "cancelled") {
       events.push(toBookingEvent("BOOKING_CANCELLED", booking));
+      continue;
+    }
+    if (!previous.depositReceived && booking.depositReceived) {
+      events.push(toBookingEvent("DEPOSIT_RECEIVED", booking));
       continue;
     }
     if (hasBookingChanged(previous, booking)) {
@@ -94,43 +105,18 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
   return events;
 }
 
-async function readKV(): Promise<KVPayload | null> {
-  if (!BASE || !TOKEN) return null;
-  const res = await fetch(`${BASE}/get/${KEY}`, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-    cache: "no-store",
-  });
-  const json = (await res.json()) as { result: string | null };
-  if (!json.result) return null;
-  const parsed = JSON.parse(json.result) as KVPayload | Booking[];
-  if (Array.isArray(parsed)) {
-    return { v: 1, ts: new Date().toISOString(), data: parsed };
-  }
-  return parsed as KVPayload;
-}
-
-async function writeKV(payload: KVPayload): Promise<void> {
-  if (!BASE || !TOKEN) return;
-  await fetch(`${BASE}/pipeline`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify([["SET", KEY, JSON.stringify(payload)]]),
-  });
-}
-
 function normalizeDeletedIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((id) => String(id).trim()).filter(Boolean);
 }
 
+const CAS_MAX_RETRIES = 4;
+
 export async function POST(req: NextRequest) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
 
-  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+  if (!kvConfigured()) return kvNotConfiguredResponse();
 
   try {
     const body = (await req.json()) as { bookings: Booking[]; deletedIds?: string[] };
@@ -138,51 +124,67 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(incoming)) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
-    const deletedIds = new Set(normalizeDeletedIds(body.deletedIds));
+    const requestDeletedIds = normalizeDeletedIds(body.deletedIds);
 
-    const current = await readKV();
-    for (const id of current?.deletedIds ?? []) deletedIds.add(id);
-    const existing = ((current?.data ?? []) as Booking[]).filter((booking) => !deletedIds.has(booking.id));
-    const mergedMap = new Map(existing.map((booking) => [booking.id, booking]));
-    let mergedCount = 0;
-    let updatedCount = 0;
+    // CAS retry loop: in caso di scrittura concorrente (operatore + cron Airbnb,
+    // due tab, ecc.) si ri-legge il KV e si ri-applica il merge — nessuna
+    // modifica viene più sovrascritta in silenzio.
+    for (let attempt = 0; attempt < CAS_MAX_RETRIES; attempt++) {
+      const deletedIds = new Set(requestDeletedIds);
+      const current = await readBookingsKV();
+      for (const id of current?.deletedIds ?? []) deletedIds.add(id);
+      const existing = ((current?.data ?? []) as Booking[]).filter((booking) => !deletedIds.has(booking.id));
+      const mergedMap = new Map(existing.map((booking) => [booking.id, booking]));
+      let mergedCount = 0;
+      let updatedCount = 0;
 
-    for (const booking of incoming) {
-      if (!booking || !booking.id) continue;
-      if (deletedIds.has(booking.id)) continue;
-      const previous = mergedMap.get(booking.id);
-      if (!previous) {
-        mergedMap.set(booking.id, booking);
-        mergedCount += 1;
+      for (const booking of incoming) {
+        if (!booking || !booking.id) continue;
+        if (deletedIds.has(booking.id)) continue;
+        const previous = mergedMap.get(booking.id);
+        if (!previous) {
+          mergedMap.set(booking.id, booking);
+          mergedCount += 1;
+          continue;
+        }
+        if (bookingUpdatedMs(booking) > bookingUpdatedMs(previous)) {
+          mergedMap.set(booking.id, { ...previous, ...booking });
+          updatedCount += 1;
+        }
+      }
+
+      const merged = Array.from(mergedMap.values()).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+
+      const newPayload: KVBookingsPayload = {
+        v: (current?.v ?? 0) + 1,
+        ts: new Date().toISOString(),
+        data: merged,
+        deletedIds: capDeletedIds(Array.from(deletedIds)),
+      };
+
+      const written = await casWriteBookingsKV(current?.v ?? 0, newPayload);
+      if (!written) {
+        // Versione cambiata sotto i nostri piedi: retry con dati freschi.
         continue;
       }
-      if (bookingUpdatedMs(booking) > bookingUpdatedMs(previous)) {
-        mergedMap.set(booking.id, { ...previous, ...booking });
-        updatedCount += 1;
-      }
+
+      await notifyN8NBookingEvents(
+        collectBookingEvents(existing, merged),
+        "api/bookings/merge-local"
+      );
+
+      return NextResponse.json({
+        merged: mergedCount,
+        updated: updatedCount,
+        total: merged.length,
+        v: newPayload.v,
+      });
     }
 
-    const merged = Array.from(mergedMap.values()).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-
-    const newPayload: KVPayload = {
-      v: (current?.v ?? 0) + 1,
-      ts: new Date().toISOString(),
-      data: merged,
-      deletedIds: Array.from(deletedIds),
-    };
-
-    await writeKV(newPayload);
-    await notifyN8NBookingEvents(
-      collectBookingEvents(existing, merged),
-      "api/bookings/merge-local"
+    return NextResponse.json(
+      { error: "conflict: troppe scritture concorrenti, riprova" },
+      { status: 409 }
     );
-
-    return NextResponse.json({
-      merged: mergedCount,
-      updated: updatedCount,
-      total: merged.length,
-      v: newPayload.v,
-    });
   } catch (err) {
     return NextResponse.json(
       { error: String(err) },

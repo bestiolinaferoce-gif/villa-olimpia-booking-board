@@ -12,13 +12,9 @@ function genId(): string {
   return `exp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Autenticazione via cookie di sessione httpOnly (same-origin): nessun segreto nel bundle. */
 function internalHeaders(): HeadersInit {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-  if (typeof token === "string" && token.length > 0) {
-    headers["X-Internal-Token"] = token;
-  }
-  return headers;
+  return { "Content-Type": "application/json" };
 }
 
 function readLocal(): Expense[] {

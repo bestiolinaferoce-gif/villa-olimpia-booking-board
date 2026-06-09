@@ -1,33 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
 import type { Booking } from '@/lib/types';
+import {
+  capDeletedIds,
+  casWriteBookingsKV,
+  kvConfigured,
+  readBookingsKV,
+  type KVBookingsPayload,
+} from '@/lib/kvCas';
 
-const BASE = process.env.KV_REST_API_URL ?? '';
-const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'vob_bookings';
-
-type KVPayload = { v: number; ts: string; data: Booking[]; deletedIds?: string[] };
-
-async function readKV(): Promise<KVPayload> {
-  if (!BASE || !TOKEN) return { v: 0, ts: '', data: [] };
-  const res = await fetch(`${BASE}/get/${KEY}`, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-    cache: 'no-store',
-  });
-  const json = (await res.json()) as { result: string | null };
-  if (!json.result) return { v: 0, ts: '', data: [] };
-  const parsed = JSON.parse(json.result) as KVPayload | Booking[];
-  if (Array.isArray(parsed)) return { v: 1, ts: '', data: parsed };
-  return parsed;
-}
-
-async function writeKV(payload: KVPayload): Promise<void> {
-  await fetch(`${BASE}/pipeline`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([['SET', KEY, JSON.stringify(payload)]]),
-  });
-}
+const CAS_MAX_RETRIES = 4;
 
 export async function PUT(
   req: NextRequest,
@@ -35,36 +17,45 @@ export async function PUT(
 ) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
-  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+  if (!kvConfigured()) return kvNotConfiguredResponse();
   try {
     const { id } = await params;
     const updates = (await req.json()) as Partial<Booking>;
-    const current = await readKV();
-    // Fix P-1: non resuscitare un record già cancellato (tombstone).
-    if ((current.deletedIds ?? []).includes(id)) {
-      return NextResponse.json(
-        { ok: false, error: 'gone', reason: 'Record cancellato (tombstone): non aggiornabile.' },
-        { status: 410 }
-      );
+
+    for (let attempt = 0; attempt < CAS_MAX_RETRIES; attempt++) {
+      const current = (await readBookingsKV()) ?? { v: 0, ts: '', data: [] as Booking[] };
+      // Fix P-1: non resuscitare un record già cancellato (tombstone).
+      if ((current.deletedIds ?? []).includes(id)) {
+        return NextResponse.json(
+          { ok: false, error: 'gone', reason: 'Record cancellato (tombstone): non aggiornabile.' },
+          { status: 410 }
+        );
+      }
+      const idx = current.data.findIndex((b) => b.id === id);
+      if (idx === -1) return NextResponse.json({ ok: false }, { status: 404 });
+      const updated: Booking = {
+        ...current.data[idx],
+        ...updates,
+        id,
+        updatedAt: new Date().toISOString(),
+      };
+      const newData = [...current.data];
+      newData[idx] = updated;
+      const newPayload: KVBookingsPayload = {
+        v: current.v + 1,
+        ts: new Date().toISOString(),
+        data: newData,
+        deletedIds: current.deletedIds,
+      };
+      const written = await casWriteBookingsKV(current.v, newPayload);
+      if (!written) continue; // scrittura concorrente: retry con dati freschi
+      return NextResponse.json({ ok: true, booking: updated, v: newPayload.v });
     }
-    const idx = current.data.findIndex((b) => b.id === id);
-    if (idx === -1) return NextResponse.json({ ok: false }, { status: 404 });
-    const updated: Booking = {
-      ...current.data[idx],
-      ...updates,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-    const newData = [...current.data];
-    newData[idx] = updated;
-    const newPayload: KVPayload = {
-      v: current.v + 1,
-      ts: new Date().toISOString(),
-      data: newData,
-      deletedIds: current.deletedIds,
-    };
-    await writeKV(newPayload);
-    return NextResponse.json({ ok: true, booking: updated, v: newPayload.v });
+
+    return NextResponse.json(
+      { ok: false, error: 'conflict: troppe scritture concorrenti, riprova' },
+      { status: 409 }
+    );
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
@@ -76,22 +67,31 @@ export async function DELETE(
 ) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
-  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+  if (!kvConfigured()) return kvNotConfiguredResponse();
   try {
     const { id } = await params;
-    const current = await readKV();
-    const newData = current.data.filter((b) => b.id !== id);
-    if (newData.length === current.data.length) {
-      return NextResponse.json({ ok: false }, { status: 404 });
+
+    for (let attempt = 0; attempt < CAS_MAX_RETRIES; attempt++) {
+      const current = (await readBookingsKV()) ?? { v: 0, ts: '', data: [] as Booking[] };
+      const newData = current.data.filter((b) => b.id !== id);
+      if (newData.length === current.data.length) {
+        return NextResponse.json({ ok: false }, { status: 404 });
+      }
+      const newPayload: KVBookingsPayload = {
+        v: current.v + 1,
+        ts: new Date().toISOString(),
+        data: newData,
+        deletedIds: capDeletedIds(Array.from(new Set([...(current.deletedIds ?? []), id]))),
+      };
+      const written = await casWriteBookingsKV(current.v, newPayload);
+      if (!written) continue;
+      return NextResponse.json({ ok: true, v: newPayload.v });
     }
-    const newPayload: KVPayload = {
-      v: current.v + 1,
-      ts: new Date().toISOString(),
-      data: newData,
-      deletedIds: Array.from(new Set([...(current.deletedIds ?? []), id])),
-    };
-    await writeKV(newPayload);
-    return NextResponse.json({ ok: true, v: newPayload.v });
+
+    return NextResponse.json(
+      { ok: false, error: 'conflict: troppe scritture concorrenti, riprova' },
+      { status: 409 }
+    );
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }

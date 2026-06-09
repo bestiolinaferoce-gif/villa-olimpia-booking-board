@@ -26,11 +26,17 @@ async function readKV(): Promise<KVPayload | null> {
   return parsed as KVPayload;
 }
 
+/** Notti su date-only YYYY-MM-DD in UTC: immune da timezone del server e DST. */
 function nightsBetween(checkIn: string, checkOut: string): number {
-  const a = new Date(checkIn).getTime();
-  const b = new Date(checkOut).getTime();
+  const toUtc = (iso: string): number => {
+    const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+    if (!y || !m || !d) return NaN;
+    return Date.UTC(y, m - 1, d);
+  };
+  const a = toUtc(checkIn);
+  const b = toUtc(checkOut);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
-  return Math.max(0, Math.round((b - a) / (1000 * 60 * 60 * 24)));
+  return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
 export async function GET(req: NextRequest) {

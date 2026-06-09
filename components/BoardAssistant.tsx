@@ -73,10 +73,8 @@ export function BoardAssistant({
     try {
       const fd = new FormData();
       fd.append("file", files[0]);
-      const headers: Record<string, string> = {};
-      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-      if (token) headers["X-Internal-Token"] = token;
-      const res = await fetch("/api/upload", { method: "POST", headers, body: fd });
+      // Autenticazione via cookie di sessione (same-origin).
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setChatError(data.message || "Upload non riuscito.");
@@ -120,12 +118,9 @@ export function BoardAssistant({
     setInput("");
     setSending(true);
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-      if (token) headers["X-Internal-Token"] = token;
       const res = await fetch("/api/assistant", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
       });
       const data = await res.json();

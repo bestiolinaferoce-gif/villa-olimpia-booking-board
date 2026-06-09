@@ -506,10 +506,8 @@ function ExpenseForm({
       for (const file of Array.from(files)) {
         const fd = new FormData();
         fd.append("file", file);
-        const headers: Record<string, string> = {};
-        const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-        if (token) headers["X-Internal-Token"] = token;
-        const res = await fetch("/api/expenses/upload", { method: "POST", headers, body: fd });
+        // Autenticazione via cookie di sessione (same-origin).
+        const res = await fetch("/api/expenses/upload", { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok || !data.ok) {
           setUploadError(data.message || "Upload non riuscito.");

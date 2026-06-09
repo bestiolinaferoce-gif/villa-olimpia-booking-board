@@ -111,7 +111,7 @@ function BankBlock({ featured }: { featured?: boolean }) {
         <Landmark className="qt-bank-icon" size={24} aria-hidden />
         <div>
           <h3 className="qt-bank-title">Coordinate bancarie — versamento acconto</h3>
-          <p className="qt-bank-sub">Dati per bonifico bancario (30% acconto)</p>
+          <p className="qt-bank-sub">Dati per bonifico bancario ({policies.depositPercent}% acconto)</p>
         </div>
       </div>
       <div className="qt-bank-grid">

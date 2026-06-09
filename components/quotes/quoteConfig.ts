@@ -108,7 +108,7 @@ export const villaContact = {
   whatsappDigits: "393335773390",
   /** Numero visualizzato testualmente. Stringa vuota = non mostrato nel PDF. */
   phoneDisplay: "+39 333 577 3390 · +39 329 047 9193",
-  addressLine: "Località Capopiccolo, 88841 Isola di Capo Rizzuto (KR), Calabria",
+  addressLine: "Località Capo Piccolo, 88841 Isola di Capo Rizzuto (KR), Calabria",
   websiteNote: "Prenotazioni e informazioni su villaolimpiacaporizzuto.com, via email o WhatsApp.",
 } as const;
 
@@ -250,7 +250,7 @@ export const quoteLodges = [
     id: "Azalea",
     name: "Azalea",
     shortDescription:
-      "Primo piano con terrazza panoramica vista mare: soluzione luminosa per coppie e famiglie 2+2 (fino a 4 ospiti).",
+      "Primo piano con terrazza semipanoramica vista mare: soluzione luminosa per coppie e famiglie 2+2 (fino a 4 ospiti).",
     floor: "Primo piano",
     maxGuests: 4,
     bedrooms: 1,
@@ -361,12 +361,12 @@ const LODGE_QUOTE_PROFILES = {
     ],
   },
   Azalea: {
-    premiumLead: "Primo piano con terrazza panoramica vista mare: luminosa e ben posizionata, per coppie e famiglie 2+2.",
+    premiumLead: "Primo piano con terrazza semipanoramica vista mare: luminosa e ben posizionata, per coppie e famiglie 2+2.",
     compositionDetail:
-      "Primo piano con terrazza panoramica affacciata sul mare, cucina attrezzata, zona notte e giorno organizzata per soggiorni rilassanti. Soluzione luminosa e ben posizionata (fino a 4 ospiti).",
-    outdoorNote: "Terrazza panoramica con vista mare, attrezzata per il relax all’aperto.",
+      "Primo piano con terrazza semipanoramica affacciata sul mare, cucina attrezzata, zona notte e giorno organizzata per soggiorni rilassanti. Soluzione luminosa e ben posizionata (fino a 4 ospiti).",
+    outdoorNote: "Terrazza semipanoramica con vista mare, attrezzata per il relax all’aperto.",
     distinctive: [
-      "Terrazza panoramica con vista mare",
+      "Terrazza semipanoramica con vista mare",
       "Ambiente luminoso ed elegante",
       "Ideale per coppie e famiglie 2+2",
     ],
@@ -476,7 +476,7 @@ export function lodgeStructuralLine(lodge: QuoteLodge): string | null {
 export const villaMap = {
   src: "/mappa-villa.png",
   caption:
-    "Disposizione dei 9 lodge di Villa Olimpia a Capopiccolo, con piscina, giardino e accesso alla Spiaggia dei Gigli (~100 m).",
+    "Disposizione dei 9 lodge di Villa Olimpia a Capo Piccolo, con piscina, giardino e accesso alla Spiaggia dei Gigli (~100 m).",
 } as const;
 
 export const villaIntro = {

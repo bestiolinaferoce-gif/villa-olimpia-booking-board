@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bookingWriteAuthError, kvNotConfiguredResponse } from "@/lib/bookingsApiAuth";
+import { bookingReadAuthError, bookingWriteAuthError, kvNotConfiguredResponse } from "@/lib/bookingsApiAuth";
 import type { Expense } from "@/lib/expenses-types";
 
 const BASE = process.env.KV_REST_API_URL ?? "";
@@ -9,24 +9,11 @@ const KEY = "vob_expenses";
 type KVPayload = { v: number; ts: string; data: Expense[] };
 
 /**
- * Protezione lettura: same-origin (browser della board) oppure token interno.
- * Fail-open: senza secret configurato non blocca nulla.
+ * Protezione lettura: sessione (cookie httpOnly) oppure token interno.
+ * Sostituisce il vecchio check su Origin/Referer, falsificabile da chiunque.
  */
 function readAuthError(req: NextRequest): NextResponse | null {
-  const secret = (
-    process.env.NEXT_PUBLIC_API_WRITE_SECRET ??
-    process.env.API_WRITE_SECRET ??
-    process.env.CRON_SECRET ??
-    ""
-  ).trim();
-  if (!secret) return null;
-  const clientToken = (req.headers.get("x-internal-token") ?? "").trim();
-  if (clientToken === secret) return null;
-  const host = (req.headers.get("host") ?? "").trim();
-  const origin = req.headers.get("origin") ?? "";
-  const referer = req.headers.get("referer") ?? "";
-  if (host && (origin.includes(host) || referer.includes(host))) return null;
-  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return bookingReadAuthError(req);
 }
 
 async function readKV(): Promise<KVPayload> {
