@@ -436,6 +436,141 @@ textarea {
   gap: 8px;
 }
 
+.expenses-dialog {
+  width: min(1080px, 94vw);
+}
+
+.expenses-dialog .dialog-header h2 {
+  margin: 0 0 4px;
+}
+
+.expenses-dialog .dialog-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.expenses-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(180px, 260px));
+  gap: 10px;
+  align-items: end;
+}
+
+.expenses-summary > div,
+.expenses-summary label,
+.expenses-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.85rem;
+}
+
+.expenses-summary > div {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--accent-faint);
+}
+
+.expenses-summary span {
+  color: var(--muted);
+}
+
+.expenses-summary strong {
+  font-size: 1.35rem;
+}
+
+.expenses-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.expenses-form-wide {
+  grid-column: span 2;
+}
+
+.expenses-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.expenses-message {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.expenses-list {
+  overflow-x: auto;
+}
+
+.expenses-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.expenses-list th,
+.expenses-list td {
+  padding: 9px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.expenses-list th {
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.expenses-list td small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.expenses-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.expenses-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.expenses-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .expenses-summary,
+  .expenses-form {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-form-wide {
+    grid-column: auto;
+  }
+}
+
 .right-actions {
   display: flex;
   gap: 8px;

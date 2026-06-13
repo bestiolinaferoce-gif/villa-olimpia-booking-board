@@ -13,6 +13,7 @@ import {
   Mail,
   Plus,
   Printer,
+  ReceiptText,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
@@ -44,6 +45,7 @@ type ToolbarProps = {
   // action buttons
   onNewBooking: () => void;
   onEmailImport: () => void;
+  onOpenExpenses: () => void;
   onImportClick: () => void;
   onExportFormat: (format: BookingExportFormat) => void;
   onCopyIcal: () => void;
@@ -79,6 +81,7 @@ export function Toolbar({
   onMonthTheme,
   onNewBooking,
   onEmailImport,
+  onOpenExpenses,
   onImportClick,
   onExportFormat,
   onCopyIcal,
@@ -159,6 +162,10 @@ export function Toolbar({
           <button type="button" className="ghost-btn" onClick={onEmailImport}>
             <Mail size={15} />
             Importa da Email
+          </button>
+          <button type="button" className="ghost-btn" onClick={onOpenExpenses}>
+            <ReceiptText size={15} />
+            Spese
           </button>
           <button type="button" className="ghost-btn" onClick={onImportClick}>
             <Upload size={15} />

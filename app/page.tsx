@@ -27,6 +27,7 @@ import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
 import { reconcileBookings } from "@/lib/reconciliation";
 import { ACCENT_HEX_MAP, isBoardAccentId, STORAGE_ACCENT_KEY } from "@/lib/boardUiPreferences";
+import { ExpensesDialog } from "@/components/ExpensesDialog";
 
 function formatImportMergeToast(
   merged: number,
@@ -99,6 +100,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<{ incoming: Booking[] } | null>(null);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
+  const [expensesOpen, setExpensesOpen] = useState(false);
   const [printSections, setPrintSections] = useState<PrintSections>(PRINT_SECTIONS_FULL);
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
   const [printLimit, setPrintLimit] = useState<number | null>(null);
@@ -370,6 +372,7 @@ export default function Home() {
         onMonthTheme={setMonthTheme}
         onNewBooking={() => openNewBooking()}
         onEmailImport={() => setEmailImportOpen(true)}
+        onOpenExpenses={() => setExpensesOpen(true)}
         onImportClick={onImportClick}
         onExportFormat={onExportFormat}
         onCopyIcal={onCopyIcal}
@@ -463,6 +466,8 @@ export default function Home() {
         onClose={() => setEmailImportOpen(false)}
         onCreateFromPrefill={openNewBookingFromPrefill}
       />
+
+      <ExpensesDialog open={expensesOpen} onClose={() => setExpensesOpen(false)} />
 
       <ConfirmDialog
         open={importConfirm !== null}
