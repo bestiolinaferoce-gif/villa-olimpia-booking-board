@@ -56,10 +56,10 @@ window.BBGantt = function BBGantt({ view = 'month', onSelectBooking, onSelectGap
   const monthLabel = startDate.toLocaleDateString(lang==='en'?'en-GB':'it-IT', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="bb-card" style={{ padding: 0, overflow: 'hidden' }}>
+    <div className="bb-card bb-gantt" style={{ padding: 0, overflow: 'hidden' }}>
       {/* Day-of-week / day-number header */}
       <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--bb-line)', background: 'var(--bb-surface-2)', position: 'sticky', top: 0, zIndex: 4 }}>
-        <div style={{
+        <div className="bb-gantt__month" style={{
           width: lodgeColW, padding: '10px 16px',
           borderRight: '1px solid var(--bb-line)',
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -74,7 +74,7 @@ window.BBGantt = function BBGantt({ view = 'month', onSelectBooking, onSelectGap
             const isToday = sameDay(d, today);
             const we = isWeekend(d);
             return (
-              <div key={i} style={{
+              <div key={i} className="bb-gantt__day" data-today={isToday ? 'true' : 'false'} data-weekend={we ? 'true' : 'false'} style={{
                 flex: 1, minWidth: 'var(--cal-col-w)', maxWidth: view === 'month' ? 'none' : 90,
                 padding: '6px 0', textAlign: 'center',
                 borderRight: i < cols-1 ? '1px solid var(--bb-line-soft)' : 'none',
@@ -177,7 +177,7 @@ function GanttRow({ lodge, days, today, bookings, cols, lodgeColW, view, onSelec
   const cancelledB = (bookings || []).filter(b => b.status === 'cancelled');
 
   return (
-    <div style={{
+    <div className="bb-gantt__row" style={{
       display: 'flex', alignItems: 'stretch',
       borderBottom: '1px solid var(--bb-line-soft)',
       background: lodge.premium ? 'linear-gradient(90deg, rgba(201,164,92,0.05), transparent 30%)' : 'transparent',
@@ -185,7 +185,7 @@ function GanttRow({ lodge, days, today, bookings, cols, lodgeColW, view, onSelec
       minHeight: 'calc(var(--cal-row-h) + 8px)',
     }}>
       {/* Lodge label */}
-      <div style={{
+      <div className="bb-gantt__lodge" style={{
         width: lodgeColW, padding: '10px 14px',
         borderRight: '1px solid var(--bb-line)',
         display: 'flex', alignItems: 'center', gap: 10,
@@ -206,7 +206,7 @@ function GanttRow({ lodge, days, today, bookings, cols, lodgeColW, view, onSelec
       </div>
 
       {/* Track */}
-      <div style={{
+      <div className="bb-gantt__track" style={{
         flex: 1, position: 'relative',
         display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`,
         background: 'var(--bb-surface)',

@@ -532,3 +532,290 @@
 @media print {
   .v2-widget, .v2-stat { box-shadow: none !important; border-color: #ccc !important; }
 }
+
+/* ============================================================
+   RESTYLING PILOTA · Villa Olimpia
+   Campione da validare prima di applicarlo alle altre board.
+   Obiettivo: più chiarezza operativa, meno effetto demo, gerarchie
+   leggibili in giornata di lavoro.
+   ============================================================ */
+:root {
+  --bb-r-sm: 4px;
+  --bb-r: 6px;
+  --bb-r-lg: 8px;
+  --bb-r-xl: 10px;
+  --bb-shadow-sm: 0 1px 2px rgba(15, 59, 87, 0.05);
+  --bb-shadow: 0 8px 24px -20px rgba(15, 59, 87, 0.22), 0 1px 2px rgba(15, 59, 87, 0.05);
+  --bb-shadow-lg: 0 18px 42px -28px rgba(15, 59, 87, 0.28);
+}
+
+.bb[data-theme="light"] {
+  --bb-bg: #f6f2e9;
+  --bb-bg-2: #eee6d6;
+  --bb-surface: #fffdf8;
+  --bb-surface-2: #f9f2e5;
+  --bb-line: #ded2ba;
+  --bb-line-soft: #ece2d0;
+  --bb-line-strong: #c8b895;
+  --bb-ink: #12364f;
+  --bb-ink-2: #344e61;
+  --bb-mute: #66727d;
+  --bb-mute-2: #817865;
+}
+
+.bb {
+  background: linear-gradient(180deg, var(--bb-bg) 0%, #fbf8f0 100%);
+}
+
+.bb-topbar {
+  height: 64px !important;
+  padding: 10px 22px !important;
+  background: color-mix(in srgb, var(--bb-surface) 92%, transparent) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 var(--bb-line-soft);
+}
+
+.bb-brand-mark {
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #12364f, #2f7a96) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 8px 18px -12px rgba(15,59,87,0.7) !important;
+}
+
+.bb-sidebar {
+  top: 64px !important;
+  height: calc(100vh - 64px) !important;
+  background: #fbf7ee !important;
+}
+
+.bb[data-theme="dark"] .bb-sidebar {
+  background: #0d2537 !important;
+}
+
+.bb-side-nav-item {
+  transition: background 140ms, color 140ms, box-shadow 140ms !important;
+}
+
+.bb-side-nav-item[data-active="true"] {
+  box-shadow: inset 0 0 0 1px var(--bb-line-soft);
+}
+
+.content-wrap {
+  padding: 16px 20px 22px !important;
+  gap: 14px !important;
+}
+
+.bb-page-title {
+  padding: 2px 0 4px;
+}
+
+.bb-display {
+  letter-spacing: 0;
+}
+
+.bb-card,
+.v2-widget,
+.v2-stat {
+  border-radius: 8px;
+  box-shadow: var(--bb-shadow-sm);
+}
+
+.v2-widget {
+  background: color-mix(in srgb, var(--bb-surface) 94%, var(--bb-bg));
+}
+
+.v2-widget__head {
+  padding: 12px 14px 9px;
+  align-items: center;
+}
+
+.v2-widget__title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.v2-widget__sub {
+  font-size: 11px;
+}
+
+.v2-widget__head-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.v2-li {
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+
+.v2-li + .v2-li {
+  border-top: 1px solid var(--bb-line-soft);
+}
+
+.v2-li:hover {
+  background: color-mix(in srgb, var(--bb-bg-2) 55%, transparent);
+}
+
+.bb-btn {
+  border-radius: 6px;
+  height: 34px;
+  padding: 0 12px;
+  box-shadow: none;
+}
+
+.bb-btn--primary {
+  background: #12364f;
+}
+
+.bb-btn--primary:hover {
+  background: #0a2a40;
+}
+
+.bb-btn--gold {
+  background: #c9a45c;
+  border-color: #b89247;
+  color: #231a08;
+}
+
+.bb-badge {
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+.bb-gantt {
+  border-color: var(--bb-line-strong);
+}
+
+.bb-gantt__month {
+  background: var(--bb-surface-2);
+}
+
+.bb-gantt__day[data-today="true"] {
+  box-shadow: inset 0 -2px 0 var(--vo-ocean);
+}
+
+.bb-gantt__row:hover .bb-gantt__lodge,
+.bb-gantt__row:hover .bb-gantt__track {
+  background: color-mix(in srgb, var(--bb-bg-2) 46%, var(--bb-surface)) !important;
+}
+
+.bb-gantt__lodge {
+  box-shadow: 1px 0 0 var(--bb-line) !important;
+}
+
+.bb-bar {
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+}
+
+.bb-bar:hover {
+  filter: brightness(1.02) saturate(1.02);
+  box-shadow: 0 8px 18px -12px rgba(15,59,87,0.65), inset 0 0 0 1px rgba(255,255,255,0.26);
+}
+
+.bb-bar--confirmed { background: #6f946f; }
+.bb-bar--paid { background: #1f5f86; }
+.bb-bar--option { background: #c9a45c; }
+.bb-bar--quote { background: #4b9ab8; }
+.bb-bar--pending { background: #b87834; }
+
+.v2-dashboard-grid {
+  align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .v2-dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .bb-kpi-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .bb-topbar {
+    height: auto !important;
+    min-height: 64px;
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .bb-topbar > div:nth-of-type(2) {
+    display: none !important;
+  }
+
+  .bb-topbar .bb-btn {
+    height: 32px;
+    font-size: 12px;
+    padding: 0 10px;
+  }
+
+  .app-shell {
+    flex-direction: column !important;
+  }
+
+  .bb-sidebar {
+    position: relative !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--bb-line);
+  }
+
+  .bb-sidebar nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px 10px !important;
+  }
+
+  .bb-sidebar nav > div {
+    display: none;
+  }
+
+  .bb-side-nav-item {
+    width: auto !important;
+    min-width: max-content;
+    margin-bottom: 0 !important;
+  }
+
+  .bb-sidebar > div:last-child {
+    display: none !important;
+  }
+
+  .content-wrap {
+    padding: 14px 12px 18px !important;
+  }
+
+  .bb-page-title {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  .bb-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bb-gantt {
+    overflow-x: auto !important;
+  }
+
+  .bb-card:has(table) {
+    overflow-x: auto !important;
+  }
+
+  .bb-card table {
+    min-width: 760px;
+  }
+}
