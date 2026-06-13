@@ -10,14 +10,14 @@ window.BBHeader = function BBHeader({ saveStatus, onNew, onQuote, onPrint, onExp
   });
 
   return (
-    <header style={{
+    <header className="bb-topbar" style={{
       display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px',
       background: 'var(--bb-surface)', borderBottom: '1px solid var(--bb-line)',
       position: 'sticky', top: 0, zIndex: 30, height: 68,
     }}>
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
+        <div className="bb-brand-mark" style={{
           width: 38, height: 38, borderRadius: 10,
           background: 'linear-gradient(135deg, var(--vo-navy), var(--vo-ocean))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -27,7 +27,7 @@ window.BBHeader = function BBHeader({ saveStatus, onNew, onQuote, onPrint, onExp
         }}>VO</div>
         <div style={{ lineHeight: 1.15 }}>
           <div className="bb-display" style={{ fontSize: 17, fontWeight: 700 }}>
-            Villa Olimpia <span style={{ fontWeight: 400, fontStyle: 'italic', color: 'var(--bb-mute)' }}>· Booking Board</span>
+            Villa Olimpia <span style={{ fontWeight: 400, color: 'var(--bb-mute)' }}>· Booking Board</span>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--bb-mute)', marginTop: 2 }}>
             {lang === 'en' ? 'Bookings, quotes & availability — Capo Rizzuto' : 'Prenotazioni, preventivi e disponibilità — Capo Rizzuto'}
@@ -103,7 +103,7 @@ window.BBSidebar = function BBSidebar({ active, onNav, collapsed, onToggle, lang
     { id: 'export',    label: lang==='en'?'Export data':'Esporta dati',  icon: window.IconDownload },
   ];
   return (
-    <aside style={{
+    <aside className="bb-sidebar" style={{
       width: collapsed ? 72 : 230,
       flexShrink: 0,
       background: 'var(--bb-surface)',
@@ -123,6 +123,8 @@ window.BBSidebar = function BBSidebar({ active, onNav, collapsed, onToggle, lang
           const isActive = active === it.id;
           return (
             <button key={it.id} onClick={() => onNav(it.id)}
+              className="bb-side-nav-item"
+              data-active={isActive ? 'true' : 'false'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 11,
                 width: '100%', padding: collapsed ? '10px' : '9px 12px',
@@ -171,6 +173,8 @@ window.BBSidebar = function BBSidebar({ active, onNav, collapsed, onToggle, lang
 
       <div style={{ borderTop: '1px solid var(--bb-line)', padding: 10 }}>
         <button onClick={() => onNav('settings')}
+          className="bb-side-nav-item"
+          data-active={active === 'settings' ? 'true' : 'false'}
           style={{
             display: 'flex', alignItems: 'center', gap: 11,
             width: '100%', padding: collapsed ? '10px' : '9px 12px',
@@ -258,7 +262,7 @@ window.BBKpiStrip = function BBKpiStrip({ lang }) {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12 }}>
+    <div className="bb-kpi-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12 }}>
       {kpis.map((k, i) => <KpiCard key={i} {...k} />)}
     </div>
   );

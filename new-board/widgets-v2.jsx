@@ -364,7 +364,7 @@ window.V2ButtonStates = function V2ButtonStates({ lang }) {
 // ============== DASHBOARD V2 (richer composition) ==============
 window.V2Dashboard = function V2Dashboard({ lang, onAction }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+    <div className="v2-dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <window.V2RevenueOpp lang={lang} onAction={onAction}/>
         <window.V2OwnerSnapshot lang={lang}/>

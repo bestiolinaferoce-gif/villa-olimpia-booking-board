@@ -38,7 +38,7 @@ const { useState, useEffect } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "density": "compact",
-  "theme": "dark",
+  "theme": "light",
   "barStyle": "filled",
   "amounts": "show",
   "calView": "month",
@@ -179,11 +179,11 @@ function DashboardView({ lang, tweaks, monthOffset, setMonthOffset, onSelectBook
   return (
     <>
       {/* Page title */}
-      <div data-screen-label="01 Dashboard" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 }}>
+      <div className="bb-page-title" data-screen-label="01 Dashboard" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 }}>
         <div>
           <div className="bb-eyebrow">{lang==='en'?'Operations':'Operativo'}</div>
           <h1 className="bb-display" style={{ fontSize: 30, margin: '4px 0 0', letterSpacing: '-0.02em' }}>
-            {lang==='en'?'Dashboard':'Dashboard'} <span style={{ color: 'var(--bb-mute)', fontWeight: 400, fontStyle: 'italic', fontSize: 22 }}>· estate 2026</span>
+            {lang==='en'?'Dashboard':'Dashboard'} <span style={{ color: 'var(--bb-mute)', fontWeight: 400, fontSize: 22 }}>· estate 2026</span>
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -201,7 +201,7 @@ function DashboardView({ lang, tweaks, monthOffset, setMonthOffset, onSelectBook
           {/* Calendar header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h2 className="bb-display" style={{ fontSize: 20, margin: 0 }}>{lang==='en'?'Booking calendar':'Calendario prenotazioni'}</h2>
-            <span style={{ fontSize: 11.5, color: 'var(--bb-mute)' }}>· {lang==='en'?'9 lodges · click any bar to see details, dashed gaps are sellable nights':'9 lodge · clicca una barra per i dettagli, i tratteggi sono notti libere da vendere'}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--bb-mute)' }}>· {lang==='en'?'9 lodges · sellable gaps highlighted':'9 lodge · buchi vendibili evidenziati'}</span>
             <span style={{ flex: 1 }}/>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, background: 'var(--bb-bg-2)', borderRadius: 8 }}>
               <button className="bb-btn bb-btn--quiet bb-btn--icon bb-btn--sm" onClick={() => setMonthOffset(o => o-1)}><window.IconChevLeft size={13}/></button>
