@@ -33,14 +33,10 @@ export function MigrationHelper() {
       return;
     }
 
-    const migrateHeaders: Record<string, string> = { "Content-Type": "application/json" };
-    const writeToken = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-    if (typeof writeToken === "string" && writeToken.length > 0) {
-      migrateHeaders["X-Internal-Token"] = writeToken;
-    }
+    // Autenticazione via cookie di sessione (same-origin).
     fetch("/api/bookings/migrate", {
       method: "POST",
-      headers: migrateHeaders,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookings }),
     })
       .then(async (res) => {

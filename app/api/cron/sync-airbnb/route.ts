@@ -7,6 +7,7 @@ import {
   type AirbnbSyncConfig,
 } from "@/lib/airbnb-ical";
 import { getBookingApiWriteSecret } from "@/lib/bookingsApiAuth";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/serverAuth";
 
 const BASE  = process.env.KV_REST_API_URL   ?? "";
 const TOKEN = process.env.KV_REST_API_TOKEN ?? "";
@@ -69,10 +70,15 @@ interface SyncResult {
   error?: string;
 }
 
+/**
+ * Solo i record creati DAL sync iCal (dataOrigin === "sync") possono essere
+ * auto-cancellati quando spariscono dal feed. I record "import_json"
+ * (backup/restore manuali) e quelli legacy senza dataOrigin NON vanno toccati:
+ * i loro ID non coincidono con quelli del feed e verrebbero cancellati in
+ * blocco al primo cron (perdita dati silenziosa).
+ */
 function isAirbnbSyncManagedBooking(booking: Booking): boolean {
-  if (booking.channel !== "airbnb") return false;
-  const origin = booking.dataOrigin;
-  return origin === undefined || origin === "sync" || origin === "import_json";
+  return booking.channel === "airbnb" && booking.dataOrigin === "sync";
 }
 
 async function syncProperty(
@@ -113,7 +119,7 @@ async function syncProperty(
     if (idx === -1) {
       // Don't create a sync record if a manual entry already covers this lodge+period.
       // The operator has already entered the booking manually with the correct amounts.
-      const coveredByManual = updated.some(
+      const coveringIdx = updated.findIndex(
         (b) =>
           b.lodge === config.lodge &&
           b.dataOrigin !== "sync" &&
@@ -121,8 +127,27 @@ async function syncProperty(
           b.checkIn < event.dtend &&
           b.checkOut > event.dtstart
       );
-      if (coveredByManual) {
-        result.skipped++;
+      if (coveringIdx !== -1) {
+        // Fix A-1: il feed Airbnb copre un record manuale. Se le date del feed
+        // sono DIVERSE da quelle manuali, l'ospite potrebbe aver modificato il
+        // soggiorno: segnaliamo il record come "candidato aggiornamento date"
+        // (nota idempotente) invece di skippare in silenzio o duplicare.
+        const cb = updated[coveringIdx];
+        const datesDiffer = cb.checkIn !== event.dtstart || cb.checkOut !== event.dtend;
+        const marker = `⚠️ AIRBNB: date feed ${event.dtstart}→${event.dtend} diverse dal manuale (verifica)`;
+        const alreadyFlagged = (cb.notes ?? "").includes(
+          `⚠️ AIRBNB: date feed ${event.dtstart}→${event.dtend}`
+        );
+        if (datesDiffer && !alreadyFlagged) {
+          updated[coveringIdx] = {
+            ...cb,
+            notes: cb.notes ? `${cb.notes}\n${marker}` : marker,
+            updatedAt: now,
+          };
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
       } else {
         updated.push(icalEventToBooking(event, config.lodge, config.defaultGuestsCount));
         result.created++;
@@ -179,8 +204,12 @@ export async function GET(req: NextRequest) {
 
   const validCron  = cronSecret  && (auth === `Bearer ${cronSecret}`  || qs === cronSecret);
   const validWrite = writeSecret && internalTok === writeSecret;
+  // Sync manuale dal browser della board: sessione (cookie httpOnly firmato).
+  const validSession = writeSecret
+    ? verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value, writeSecret)
+    : false;
 
-  if (cronSecret && !validCron && !validWrite) {
+  if (cronSecret && !validCron && !validWrite && !validSession) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

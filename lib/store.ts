@@ -146,6 +146,19 @@ function blocksAllLodges(t: BookingType): boolean {
   return t === "whole_villa" || t === "event";
 }
 
+/**
+ * Ripartizione di un importo Villa Intera sui 9 lodge senza perdere centesimi:
+ * gli ultimi 8 lodge ricevono la quota base arrotondata per difetto, il primo
+ * assorbe il resto. La somma delle quote è SEMPRE uguale al totale originale
+ * (prima: 850/9 → 9×94,44 = 849,96 €, con 4 centesimi persi nei report/n8n).
+ */
+function splitAcrossLodges(total: number): number[] {
+  if (!(total > 0)) return LODGES.map(() => 0);
+  const base = Math.floor((total / LODGES.length) * 100) / 100;
+  const first = Math.round((total - base * (LODGES.length - 1)) * 100) / 100;
+  return LODGES.map((_, i) => (i === 0 ? first : base));
+}
+
 function ensureNoOverlap(
   bookings: Booking[],
   payload: BookingInput,
@@ -237,14 +250,11 @@ function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Bookin
   })) as Booking[];
 }
 
-/** Header per POST /api/bookings dal browser (token pubblico, stesso valore di CRON_SECRET/API_WRITE_SECRET su Vercel). */
+/** Header per le API dal browser. L'autenticazione avviene tramite il cookie
+ *  di sessione httpOnly (impostato da /api/login), inviato automaticamente
+ *  nelle richieste same-origin: nessun segreto nel bundle client. */
 function internalPostBookingsHeaders(): HeadersInit {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-  if (typeof token === "string" && token.length > 0) {
-    headers["X-Internal-Token"] = token;
-  }
-  return headers;
+  return { "Content-Type": "application/json" };
 }
 
 function readBackupSnapshotsFromLocal(): BackupSnapshot[] {
@@ -614,8 +624,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
       // Pre-check overlap on the full period (single pass: any blocking booking).
       ensureNoOverlap(bookings, { ...payload, bookingType: "whole_villa", wholeVillaGroupId: groupId });
 
-      const perLodgeAmount = payload.totalAmount > 0 ? payload.totalAmount / LODGES.length : 0;
-      const perLodgeDeposit = payload.depositAmount > 0 ? payload.depositAmount / LODGES.length : 0;
+      const amountShares = splitAcrossLodges(payload.totalAmount);
+      const depositShares = splitAcrossLodges(payload.depositAmount);
       const records: Booking[] = LODGES.map((lodge, idx) => ({
         id: uuidv4(),
         ...payload,
@@ -626,8 +636,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
         guestName,
         notes,
         economicNotes,
-        totalAmount: Math.round(perLodgeAmount * 100) / 100,
-        depositAmount: Math.round(perLodgeDeposit * 100) / 100,
+        totalAmount: amountShares[idx],
+        depositAmount: depositShares[idx],
         dataOrigin,
         createdAt: now,
         updatedAt: now,
@@ -670,8 +680,20 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
     // Use the reconciled (deduplicated) list so hidden duplicates in the raw
     // store do not trigger a false overlap error when editing the visible booking.
-    const { bookings: canonical } = reconcileBookings(bookings);
-    ensureNoOverlap(canonical, payload, id, isWholeVillaGroup ? groupId : undefined);
+    // Se lodge/date/tipo NON cambiano (es. si corregge solo nome, note o importi)
+    // il check di overlap viene saltato: un conflitto preesistente con un'altra
+    // prenotazione non deve bloccare la modifica dei metadati — la situazione
+    // non peggiora. Il check resta obbligatorio se si riattiva una cancellata.
+    const sameSlot =
+      current.checkIn === payload.checkIn &&
+      current.checkOut === payload.checkOut &&
+      current.lodge === payload.lodge &&
+      effectiveType(current) === effectiveType(payload);
+    const reactivating = current.status === "cancelled" && payload.status !== "cancelled";
+    if (!sameSlot || reactivating) {
+      const { bookings: canonical } = reconcileBookings(bookings);
+      ensureNoOverlap(canonical, payload, id, isWholeVillaGroup ? groupId : undefined);
+    }
 
     const now = new Date().toISOString();
     const guestName = payload.guestName.trim();
@@ -682,11 +704,13 @@ export const useBookingStore = create<BookingState>((set, get) => {
     if (isWholeVillaGroup) {
       // Propaga update a tutti i 9 record del gruppo (date/stato/anagrafica/note).
       // L'importo viene splittato per lodge.
-      const perLodgeAmount = payload.totalAmount > 0 ? payload.totalAmount / LODGES.length : 0;
-      const perLodgeDeposit = payload.depositAmount > 0 ? payload.depositAmount / LODGES.length : 0;
+      const amountShares = splitAcrossLodges(payload.totalAmount);
+      const depositShares = splitAcrossLodges(payload.depositAmount);
+      let groupIdx = 0;
       const next = bookings
         .map((b) => {
           if (b.wholeVillaGroupId !== groupId) return b;
+          const idx = Math.min(groupIdx++, LODGES.length - 1);
           return {
             ...b,
             ...payload,
@@ -698,8 +722,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
             guestName,
             notes,
             economicNotes,
-            totalAmount: Math.round(perLodgeAmount * 100) / 100,
-            depositAmount: Math.round(perLodgeDeposit * 100) / 100,
+            totalAmount: amountShares[idx],
+            depositAmount: depositShares[idx],
             updatedAt: now,
             guestProfile: payload.guestProfile ?? b.guestProfile,
             dataOrigin,
@@ -958,12 +982,8 @@ export const useBookingStore = create<BookingState>((set, get) => {
     if (typeof window === "undefined") return;
     get().showToast("Sync Airbnb in corso…", "success", 60000);
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-      if (typeof token === "string" && token.length > 0) {
-        headers["X-Internal-Token"] = token;
-      }
-      const res = await fetch("/api/cron/sync-airbnb", { headers, cache: "no-store" });
+      // Autenticazione via cookie di sessione (inviato automaticamente same-origin).
+      const res = await fetch("/api/cron/sync-airbnb", { cache: "no-store" });
       const data = await res.json() as { ok: boolean; totalChanges?: number; summary?: string; message?: string; error?: string };
       if (!res.ok || !data.ok) {
         get().showToast("Sync Airbnb fallito: " + (data.message ?? data.error ?? `HTTP ${res.status}`), "error");

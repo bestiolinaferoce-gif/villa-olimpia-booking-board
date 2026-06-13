@@ -32,6 +32,7 @@ import {
   villaContact,
   villaStructure,
   villaTerritoryPoints,
+  villaMap,
   getLodgeQuoteProfile,
   lodgeQuotePresentation,
   lodgeStructuralLine,
@@ -110,7 +111,7 @@ function BankBlock({ featured }: { featured?: boolean }) {
         <Landmark className="qt-bank-icon" size={24} aria-hidden />
         <div>
           <h3 className="qt-bank-title">Coordinate bancarie — versamento acconto</h3>
-          <p className="qt-bank-sub">Dati per bonifico bancario (30% acconto)</p>
+          <p className="qt-bank-sub">Dati per bonifico bancario ({policies.depositPercent}% acconto)</p>
         </div>
       </div>
       <div className="qt-bank-grid">
@@ -402,6 +403,30 @@ export const QuoteTemplate = forwardRef<HTMLDivElement, QuoteTemplateProps>(
                   </div>
                 ))}
               </div>
+            </section>
+
+            {/* Mappa digitale della villa — si nasconde se il file non esiste */}
+            <section className="qt-section" data-quote-section="mappa">
+              <h2>Mappa della struttura</h2>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={villaMap.src}
+                alt="Mappa di Villa Olimpia"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  const sec = e.currentTarget.closest('[data-quote-section="mappa"]');
+                  if (sec) (sec as HTMLElement).style.display = "none";
+                }}
+              />
+              <p className="qt-block-text" style={{ marginTop: 8, fontSize: "0.85em" }}>
+                {villaMap.caption}
+              </p>
             </section>
 
             <section className="qt-section" data-quote-section="servizi-indicativi">

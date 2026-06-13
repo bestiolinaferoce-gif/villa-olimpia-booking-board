@@ -101,6 +101,10 @@ export function BookingDialog({
   onDelete,
 }: BookingDialogProps) {
   const mode = booking ? "edit" : "create";
+  // In modifica il tipo è cambiabile liberamente tra Singolo lodge ed Evento.
+  // La conversione da/verso Villa Intera resta bloccata: è un gruppo di 9 record,
+  // va gestita con elimina + ricrea per non corrompere i dati.
+  const lockTypeChange = mode === "edit" && booking?.bookingType === "whole_villa";
   const [form, setForm] = useState<FormState>(buildDefault(initialLodge, initialDate));
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -270,7 +274,7 @@ export function BookingDialog({
                 <BookingTypeRadio
                   value="single_lodge"
                   current={form.bookingType ?? "single_lodge"}
-                  disabled={mode === "edit"}
+                  disabled={lockTypeChange}
                   onChange={(v) => change("bookingType", v)}
                   icon={<Home size={16} />}
                   label="Singolo lodge"
@@ -288,7 +292,7 @@ export function BookingDialog({
                 <BookingTypeRadio
                   value="event"
                   current={form.bookingType ?? "single_lodge"}
-                  disabled={mode === "edit"}
+                  disabled={lockTypeChange}
                   onChange={(v) => change("bookingType", v)}
                   icon={<PartyPopper size={16} />}
                   label="Evento / Ricevimento"
@@ -413,6 +417,40 @@ export function BookingDialog({
                 <textarea value={form.notes} onChange={(e) => change("notes", e.target.value)} rows={3} />
               </label>
             </div>
+            {booking?.attachments && booking.attachments.length > 0 && (
+              <div className="form-section">
+                <p className="form-section-title">Documenti allegati</p>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {booking.attachments.map((a, i) => (
+                    <a
+                      key={i}
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        textDecoration: "none",
+                        border: "1px solid var(--border, #e2e8f0)",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontSize: 13,
+                        color: "inherit",
+                      }}
+                    >
+                      <span style={{ color: "#b45309" }}>📎</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {a.name}
+                      </span>
+                      {a.kind ? (
+                        <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase" }}>{a.kind}</span>
+                      ) : null}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="form-section">
               <p className="form-section-title">Stato Pratica Adempimenti</p>
               <div className="form-grid">

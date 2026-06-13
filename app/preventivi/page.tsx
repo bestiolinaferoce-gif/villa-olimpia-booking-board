@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PasswordGate } from "@/components/PasswordGate";
 import { QuotesPage } from "@/components/quotes/QuotesPage";
 import PremiumQuotePanel from "@/components/quotes/PremiumQuotePanel";
+import { TemplateGallery } from "@/components/quotes/TemplateGallery";
 
 function PremiumButton() {
   const [open, setOpen] = useState(false);
@@ -59,6 +60,9 @@ function PremiumButton() {
 export default function PreventiviPage() {
   return (
     <PasswordGate subtitle="Stessa password del Booking Board — accesso al modulo Preventivi.">
+      <div style={{ padding: "16px 16px 0" }}>
+        <TemplateGallery />
+      </div>
       <QuotesPage />
       <PremiumButton />
     </PasswordGate>

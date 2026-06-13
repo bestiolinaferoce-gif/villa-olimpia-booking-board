@@ -13,8 +13,8 @@ import {
   Mail,
   Plus,
   Printer,
-  ReceiptText,
   Upload,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -45,7 +45,6 @@ type ToolbarProps = {
   // action buttons
   onNewBooking: () => void;
   onEmailImport: () => void;
-  onOpenExpenses: () => void;
   onImportClick: () => void;
   onExportFormat: (format: BookingExportFormat) => void;
   onCopyIcal: () => void;
@@ -81,7 +80,6 @@ export function Toolbar({
   onMonthTheme,
   onNewBooking,
   onEmailImport,
-  onOpenExpenses,
   onImportClick,
   onExportFormat,
   onCopyIcal,
@@ -159,13 +157,18 @@ export function Toolbar({
             <FileText size={15} />
             Crea preventivo
           </Link>
+          <Link
+            href="/spese"
+            className="ghost-btn"
+            title="Apri la scheda Spese"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <Wallet size={15} />
+            Spese
+          </Link>
           <button type="button" className="ghost-btn" onClick={onEmailImport}>
             <Mail size={15} />
             Importa da Email
-          </button>
-          <button type="button" className="ghost-btn" onClick={onOpenExpenses}>
-            <ReceiptText size={15} />
-            Spese
           </button>
           <button type="button" className="ghost-btn" onClick={onImportClick}>
             <Upload size={15} />

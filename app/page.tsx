@@ -13,7 +13,7 @@ import { Toast } from "@/components/Toast";
 import { Toolbar } from "@/components/Toolbar";
 import { PasswordGate } from "@/components/PasswordGate";
 import { KPIPanel } from "@/components/KPIPanel";
-import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types";
+import { type Booking, type BookingAttachment, type BookingInput, type Lodge, LODGES } from "@/lib/types";
 import { useBookingStore, type ImportMergeSkipDetail } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
@@ -22,12 +22,12 @@ import { PrintOptionsDialog } from "@/components/PrintOptionsDialog";
 import { PRINT_SECTIONS_FULL, type PrintSections } from "@/lib/printConfig";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { OverbookingPanel } from "@/components/OverbookingPanel";
+import { BoardAssistant, type AssistantAction } from "@/components/BoardAssistant";
 import { MigrationHelper } from "@/components/MigrationHelper";
 import { clearAuthSession } from "@/lib/authSession";
 import { runBookingExport, type BookingExportFormat } from "@/lib/bookingExportFormats";
 import { reconcileBookings } from "@/lib/reconciliation";
 import { ACCENT_HEX_MAP, isBoardAccentId, STORAGE_ACCENT_KEY } from "@/lib/boardUiPreferences";
-import { ExpensesDialog } from "@/components/ExpensesDialog";
 
 function formatImportMergeToast(
   merged: number,
@@ -100,7 +100,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<{ incoming: Booking[] } | null>(null);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
-  const [expensesOpen, setExpensesOpen] = useState(false);
   const [printSections, setPrintSections] = useState<PrintSections>(PRINT_SECTIONS_FULL);
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
   const [printLimit, setPrintLimit] = useState<number | null>(null);
@@ -174,6 +173,46 @@ export default function Home() {
     setEditing(booking);
     setPrefill({});
     setDialogOpen(true);
+  }
+
+  /** Applica un'azione proposta dall'assistente AI (previa conferma utente nella chat). */
+  function applyAssistantAction(action: AssistantAction): { ok: boolean; message: string } {
+    const id = String(action.input.bookingId ?? "");
+    const booking = canonicalBookings.find((b) => b.id === id);
+    if (!booking) return { ok: false, message: "Prenotazione non trovata." };
+    // BookingInput = Booking senza id/createdAt/updatedAt
+    const { id: _id, createdAt: _c, updatedAt: _u, ...base } = booking;
+    void _id; void _c; void _u;
+    const payload: BookingInput = { ...base };
+    try {
+      if (action.tool === "mark_deposit_received") {
+        payload.depositReceived = true;
+      } else if (action.tool === "set_status") {
+        const status = String(action.input.status);
+        if (!["confirmed", "option", "cancelled"].includes(status)) {
+          return { ok: false, message: "Stato non valido." };
+        }
+        payload.status = status as Booking["status"];
+      } else if (action.tool === "update_amounts") {
+        if (typeof action.input.totalAmount === "number") payload.totalAmount = action.input.totalAmount;
+        if (typeof action.input.depositAmount === "number") payload.depositAmount = action.input.depositAmount;
+      } else if (action.tool === "attach_to_booking") {
+        const att = action.input.attachment as BookingAttachment | undefined;
+        if (!att || !att.url) return { ok: false, message: "Nessun file allegato." };
+        const kind = action.input.kind;
+        const attachment: BookingAttachment = {
+          ...att,
+          kind: typeof kind === "string" ? (kind as BookingAttachment["kind"]) : att.kind,
+        };
+        payload.attachments = [...(booking.attachments ?? []), attachment];
+      } else {
+        return { ok: false, message: "Azione non riconosciuta." };
+      }
+      updateBooking(booking.id, payload);
+      return { ok: true, message: "Applicato." };
+    } catch {
+      return { ok: false, message: "Errore durante l'applicazione." };
+    }
   }
 
   function onImportClick() {
@@ -372,7 +411,6 @@ export default function Home() {
         onMonthTheme={setMonthTheme}
         onNewBooking={() => openNewBooking()}
         onEmailImport={() => setEmailImportOpen(true)}
-        onOpenExpenses={() => setExpensesOpen(true)}
         onImportClick={onImportClick}
         onExportFormat={onExportFormat}
         onCopyIcal={onCopyIcal}
@@ -422,6 +460,15 @@ export default function Home() {
         onOpenBooking={openEditBooking}
       />
 
+      <BoardAssistant
+        bookings={canonicalBookings}
+        conflicts={reconciled.conflicts}
+        onOpenBooking={openEditBooking}
+        monthLabel={format(monthDate, "MMMM yyyy")}
+        monthRevenue={monthKPIs.revenue}
+        onApplyAction={applyAssistantAction}
+      />
+
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
 
       <ErrorBoundary>
@@ -466,8 +513,6 @@ export default function Home() {
         onClose={() => setEmailImportOpen(false)}
         onCreateFromPrefill={openNewBookingFromPrefill}
       />
-
-      <ExpensesDialog open={expensesOpen} onClose={() => setExpensesOpen(false)} />
 
       <ConfirmDialog
         open={importConfirm !== null}

@@ -1,29 +1,24 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getServerWriteSecret, safeEqual, SESSION_COOKIE, verifySessionToken } from "@/lib/serverAuth";
 
-/** Vercel deploy o build production: richiede secret di scrittura per le API mutanti. */
+/** Vercel deploy o build production: richiede autenticazione per le API mutanti. */
 export function isBookingsApiProductionLike(): boolean {
   return process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
 }
 
 export function getBookingApiWriteSecret(): string {
-  // Client always sends NEXT_PUBLIC_API_WRITE_SECRET; server must validate against
-  // the same value. Fall back to API_WRITE_SECRET then CRON_SECRET for compat.
-  return (
-    process.env.NEXT_PUBLIC_API_WRITE_SECRET ??
-    process.env.API_WRITE_SECRET ??
-    process.env.CRON_SECRET ??
-    ""
-  ).trim();
+  return getServerWriteSecret();
 }
 
 /**
- * Stesso schema di POST /api/bookings: header X-Internal-Token uguale a API_WRITE_SECRET o CRON_SECRET.
+ * Autenticazione scritture: sessione browser (cookie httpOnly firmato, impostato
+ * da /api/login) OPPURE header X-Internal-Token uguale al secret server-side
+ * (n8n, cron, automazioni). Il secret non è mai presente nel bundle client.
  * In ambiente production-like senza secret configurato → 503 (niente scritture anonime).
  */
 export function bookingWriteAuthError(req: NextRequest): NextResponse | null {
   const apiSecret = getBookingApiWriteSecret();
-  const clientToken = (req.headers.get("x-internal-token") ?? "").trim();
 
   if (isBookingsApiProductionLike() && !apiSecret) {
     return NextResponse.json(
@@ -35,11 +30,32 @@ export function bookingWriteAuthError(req: NextRequest): NextResponse | null {
     );
   }
 
-  if (apiSecret && clientToken !== apiSecret) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  if (!apiSecret) return null;
 
-  return null;
+  const clientToken = (req.headers.get("x-internal-token") ?? "").trim();
+  if (clientToken && safeEqual(clientToken, apiSecret)) return null;
+
+  const session = req.cookies.get(SESSION_COOKIE)?.value;
+  if (verifySessionToken(session, apiSecret)) return null;
+
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+}
+
+/**
+ * Autenticazione letture: stessi criteri delle scritture (sessione o token).
+ * Fail-open senza secret configurato (sviluppo locale).
+ */
+export function bookingReadAuthError(req: NextRequest): NextResponse | null {
+  const apiSecret = getBookingApiWriteSecret();
+  if (!apiSecret) return null;
+
+  const clientToken = (req.headers.get("x-internal-token") ?? "").trim();
+  if (clientToken && safeEqual(clientToken, apiSecret)) return null;
+
+  const session = req.cookies.get(SESSION_COOKIE)?.value;
+  if (verifySessionToken(session, apiSecret)) return null;
+
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
 export function kvNotConfiguredResponse(): NextResponse {

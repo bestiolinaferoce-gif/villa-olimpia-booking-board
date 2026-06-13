@@ -100,6 +100,19 @@ export type Booking = {
   eventType?: EventType;
   /** ID condiviso tra i 9 record di una stessa Villa Intera. */
   wholeVillaGroupId?: string;
+  /** Documenti allegati (documento ospite, ricevuta caparra, contratto, ecc.). */
+  attachments?: BookingAttachment[];
+};
+
+/** Documento allegato a una prenotazione (es. documento ospite, ricevuta caparra). */
+export type BookingAttachment = {
+  name: string;
+  url: string;
+  size: number;
+  contentType: string;
+  uploadedAt: string;
+  /** Categoria opzionale. */
+  kind?: "documento" | "ricevuta" | "contratto" | "altro";
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;
